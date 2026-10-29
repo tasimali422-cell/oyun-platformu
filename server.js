@@ -17,8 +17,15 @@ const send = (ws, data) => {if(ws.readyState===WebSocket.OPEN) ws.send(JSON.stri
 function view(room){return {id:room.id,game:room.game,name:room.name,players:room.players.size,max:maxFor(room.game),created:room.created,started:room.started};}
 function list(){return [...rooms.values()].map(view);}
 function broadcast(){const packet=JSON.stringify({type:'state',online:clients.size,rooms:list()});for(const ws of clients.keys())if(ws.readyState===WebSocket.OPEN)ws.send(packet);}
-function notifyRoom(room){const seats=[...room.players].map((ws,i)=>({seat:i+1,name:clients.get(ws)?.name||'Misafir',host:ws===room.host}));for(const ws of room.players)send(ws,{type:'room',...view(room),seats,host:ws===room.host,chat:room.chat});}
-function leave(ws){const state=clients.get(ws);if(!state?.room)return;const room=rooms.get(state.room);state.room=null;if(!room)return;room.players.delete(ws);if(!room.players.size){rooms.delete(room.id);}else{if(room.host===ws)room.host=room.players.values().next().value;notifyRoom(room);}}
+function tiles(){
+ const a=[];for(let copy=0;copy<2;copy++)for(let color=0;color<4;color++)for(let n=1;n<=13;n++)a.push({id:randomUUID(),color,n});
+ for(let j=0;j<2;j++)a.push({id:randomUUID(),color:4,n:0});
+ for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;
+}
+function gameState(room,ws){if(!room.round)return null;const g=room.round;const idx=g.order.indexOf(ws);if(idx<0)return null;return {mySeat:idx+1,hand:g.hands[idx],turn:g.turn+1,phase:g.phase,wall:g.wall.length,discard:g.discard.slice(-8).map(t=>({...t})),roundStatus:g.status,notice:g.notice};}
+function beginOkey(room){const deck=tiles();const order=[...room.players];const hands=order.map((_,i)=>deck.splice(0,i===0?15:14));room.round={order,hands,wall:deck,discard:[],turn:0,phase:'discard',status:'playing',notice:'İlk oyuncu taş atacak.'};}
+function notifyRoom(room){const seats=[...room.players].map((ws,i)=>({seat:i+1,name:clients.get(ws)?.name||'Misafir',host:ws===room.host}));for(const ws of room.players)send(ws,{type:'room',...view(room),seats,host:ws===room.host,chat:room.chat,gameState:gameState(room,ws)});}
+function leave(ws){const state=clients.get(ws);if(!state?.room)return;const room=rooms.get(state.room);state.room=null;if(!room)return;room.players.delete(ws);if(!room.players.size){rooms.delete(room.id);}else{if(room.host===ws)room.host=room.players.values().next().value;if(room.round){room.round.status='stopped';room.round.notice='Bir oyuncu ayrıldı. Yeni el için masa yeniden kurulmalı.';room.started=false;room.round=null;}notifyRoom(room);}}
 const server = http.createServer((req,res)=>{
   const url=new URL(req.url||'/','http://localhost');
   if(url.pathname==='/health'){res.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify({ok:true}));return;}
@@ -58,7 +65,26 @@ wss.on('connection',ws=>{
     } else if(data.type==='start'){
       const room=rooms.get(user.room);if(!room||room.host!==ws)return send(ws,{type:'error',message:'Yalnızca masa sahibi başlatabilir.'});
       if(room.players.size<2)return send(ws,{type:'error',message:'Başlamak için en az iki oyuncu gerekli.'});
-      room.started=true;notifyRoom(room);broadcast();
+      if(room.game==='okey'){
+        if(room.players.size!==4)return send(ws,{type:'error',message:'Okey deneme eli için 4 oyuncu gerekli.'});
+        room.started=true;beginOkey(room);
+      }else room.started=true;
+      notifyRoom(room);broadcast();
+    } else if(data.type==='draw'||data.type==='discard'){
+      const room=rooms.get(user.room);const g=room?.round;if(!room||room.game!=='okey'||!g||g.status!=='playing')return send(ws,{type:'error',message:'Aktif Okey eli yok.'});
+      const seat=g.order.indexOf(ws);if(seat!==g.turn)return send(ws,{type:'error',message:'Sıra sende değil.'});
+      if(data.type==='draw'){
+        if(g.phase!=='draw')return send(ws,{type:'error',message:'Önce taş atmalısın.'});
+        const source=data.source==='discard'?'discard':'wall';
+        const t=source==='discard'?g.discard.pop():g.wall.pop();if(!t)return send(ws,{type:'error',message:'Bu kaynaktan taş çekilemiyor.'});
+        g.hands[seat].push(t);g.phase='discard';g.notice=`${seat+1}. oyuncu taş çekti.`;
+      }else{
+        if(g.phase!=='discard')return send(ws,{type:'error',message:'Önce taş çekmelisin.'});
+        const id=clean(data.id,64);const index=g.hands[seat].findIndex(t=>t.id===id);if(index<0)return send(ws,{type:'error',message:'Bu taş elinde yok.'});
+        g.discard.push(g.hands[seat].splice(index,1)[0]);g.turn=(g.turn+1)%g.order.length;g.phase='draw';g.notice=`${seat+1}. oyuncu taş attı. Sıra ${g.turn+1}. oyuncuda.`;
+        if(!g.wall.length){g.status='ended';g.notice='Ortadaki taşlar bitti. Deneme eli sona erdi.';room.started=false;}
+      }
+      notifyRoom(room);broadcast();
     }
   });
   ws.on('close',()=>{leave(ws);clients.delete(ws);broadcast();});ws.on('error',()=>{});
