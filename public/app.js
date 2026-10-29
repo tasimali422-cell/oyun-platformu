@@ -8,7 +8,7 @@ function toast(msg){const t=byId('toast');t.textContent=msg;t.classList.add('sho
 function send(value){if(!connected)return toast('Bağlantı kesildi; yeniden bağlanıyor...');socket.send(JSON.stringify(value));}
 function render(){byId('roomcount').textContent=rooms.length;const holder=byId('rooms');holder.replaceChildren();if(!rooms.length){const p=document.createElement('div');p.className='empty';p.textContent='Henüz açık masa yok. İlk deneme masasını sen oluştur.';holder.append(p);return;}
 for(const r of rooms){const row=document.createElement('article');row.className='room';const icon=document.createElement('span');icon.className='room-icon';icon.textContent=catalog.find(g=>g[0]===r.game)?.[3]||'✦';const info=document.createElement('div');info.className='info';const title=document.createElement('b');title.textContent=r.name;const sub=document.createElement('small');sub.textContent=`${catalog.find(g=>g[0]===r.game)?.[1]||'Oyun'} • ${r.players}/${r.max} kişi${r.game==='tombala'?' • '+Math.round((r.settings?.drawInterval||30000)/1000)+' sn • Kart '+(r.settings?.ticketCost??100)+' puan':''}${r.started?' • Başladı':''}`;info.append(title,sub);const btn=document.createElement('button');btn.className='outline';btn.textContent=joined===r.id?'Masaya gir':r.started?'Başladı':r.players>=r.max?'Masa dolu':'Masaya katıl';btn.disabled=!connected||(r.started&&joined!==r.id)||(r.players>=r.max&&joined!==r.id);btn.addEventListener('click',()=>{if(joined===r.id){showRoom();}else send({type:'join',id:r.id});});row.append(icon,info,btn);holder.append(row);}}
-function showRoom(){if(!joined||!roomDetail)return;byId('mobileChatToggle').hidden=roomDetail.game!=='tombala';byId('lobbyPage').hidden=true;byId('roomPage').hidden=false;byId('roomTitle').textContent=roomDetail.name;byId('roomGame').textContent=catalog.find(g=>g[0]===roomDetail.game)?.[1]||'Oyun';byId('seatCount').textContent=`${roomDetail.players}/${roomDetail.max} kişi`;byId('roomPage').classList.toggle('tombala-room',roomDetail.game==='tombala');
+function showRoom(){if(!joined||!roomDetail)return;byId('mobileChatToggle').hidden=roomDetail.game!=='tombala';byId('lobbyPage').hidden=true;byId('roomPage').hidden=false;byId('roomTitle').textContent=roomDetail.name;byId('roomGame').textContent=catalog.find(g=>g[0]===roomDetail.game)?.[1]||'Oyun';byId('seatCount').textContent=`${roomDetail.players}/${roomDetail.max} kişi`;byId('roomPage').classList.toggle('tombala-room',roomDetail.game==='tombala');byId('roomPage').classList.toggle('okey-room',roomDetail.game==='okey');
  const seats=byId('seats');seats.replaceChildren();for(let i=0;i<(roomDetail.game==='tombala'?roomDetail.seats.length:roomDetail.max);i++){const player=roomDetail.seats[i];const card=document.createElement('div');card.className='seat'+(player?' occupied':'');const avatar=document.createElement('span');avatar.className='seat-avatar';avatar.textContent=player?(player.name[0]||'O').toUpperCase():'+';const desc=document.createElement('div');const b=document.createElement('b');b.textContent=player?player.name+(player.online===false?' (bağlantı kesildi)':''):'Boş koltuk';const sm=document.createElement('small');sm.textContent=player?.host?'Masa sahibi':player?'Oyuncu':'Oyuncu bekleniyor';desc.append(b,sm);card.append(avatar,desc);seats.append(card);}
  byId('startGame').hidden=!roomDetail.host||roomDetail.started;byId('startGame').disabled=roomDetail.game==='okey'&&roomDetail.players!==4;byId('startGame').title=roomDetail.game==='okey'&&roomDetail.players!==4?'Klasik Okey için 4 oyuncu gerekli':'';byId('roomMessage').textContent=roomDetail.game==='tombala'?'Sayıları kartlarında 30 saniye içinde işaretle. Çekiliş sonucu sunucuda doğrulanır.':roomDetail.finalResult?'Maç sona erdi. Final puanları uygulandı.':roomDetail.game==='okey'?(roomDetail.started?'Okey deneme eli aktif. Taşlarını ıstakanda sırala; sıra sendeyken taş çek veya taş at.':`Klasik Okey deneme elini başlatmak için 4 oyuncu gerekli (${roomDetail.players}/4).`):(roomDetail.started?'Deneme oturumu başladı; bu oyun için kurallar henüz eklenmedi.':'Masa hazır. Oyuncular katılabilir ve sohbet edebilir.');
  byId('tombalaArea').hidden=roomDetail.game!=='tombala';if(roomDetail.game==='tombala')renderTombala();byId('tombalaRules').textContent=roomDetail.game==='tombala'?`Çekiliş: ${Math.round((roomDetail.settings?.drawInterval||30000)/1000)} saniye • Oyuncu: ${roomDetail.max} • Kart: ${roomDetail.settings?.ticketCost??100} puan • 1. Çinko: ${roomDetail.settings?.prize1??500} • 2. Çinko: ${roomDetail.settings?.prize2??1000} • Tombala: ${roomDetail.settings?.prize3??2500} (tanıtım puanları; bakiye işlemi henüz aktif değil)`:'';byId('tableSettings').textContent=roomDetail.game==='okey'?`Başlangıç: 0 • Eksi limit: -${roomDetail.settings?.lossLimit||20} • Gösterge cezası: ${roomDetail.settings?.showIndicator?'açık':'kapalı'} • Puanlar: ${(roomDetail.scores||[0,0,0,0]).join(' / ')}`:'';renderOkey();const feed=byId('chatMessages');feed.replaceChildren();for(const m of roomDetail.chat||[]){const line=document.createElement('div');line.className='chatline';const name=document.createElement('b');name.textContent=m.name+': ';const msg=document.createElement('span');msg.textContent=m.message;line.append(name,msg);feed.append(line);}feed.scrollTop=feed.scrollHeight;
@@ -34,7 +34,7 @@ function renderOkey(){
  el.hidden=roomDetail?.game!=='okey'||!state;
  if(el.hidden){selectedTile=null;lastRoomKey=null;return;}
  const key=roomDetail.id;if(lastRoomKey!==key){rackOrder=[];selectedTile=null;lastRoomKey=key;try{rackOrder=JSON.parse(localStorage.getItem('rack_'+key)||'[]');}catch{rackOrder=[];}}
- const ids=new Set(state.hand.map(t=>t.id));rackOrder=rackOrder.filter(id=>ids.has(id));for(const t of state.hand)if(!rackOrder.includes(t.id))rackOrder.push(t.id);
+ const ids=new Set(state.hand.map(t=>t.id));rackOrder=rackOrder.slice(0,30).map(id=>ids.has(id)?id:null);for(const t of state.hand)if(!rackOrder.includes(t.id)){let empty=rackOrder.indexOf(null);if(empty<0){empty=rackOrder.length;rackOrder.push(null);}rackOrder[empty]=t.id;}while(rackOrder.length<30)rackOrder.push(null);
  if(selectedTile&&!ids.has(selectedTile))selectedTile=null;
  const mine=state.turn===state.mySeat;const canDraw=mine&&state.phase==='draw'&&state.roundStatus==='playing';const canDiscard=mine&&state.phase==='discard'&&state.roundStatus==='playing';
  renderTableTiles(state);byId('okeyStatus').textContent=`${state.notice} • ${mine?'SIRA SENDE':'Rakibin sırası'} • Ortada ${state.wall} taş`;
@@ -42,12 +42,20 @@ function renderOkey(){
  byId('drawDiscard').disabled=!canDraw||state.discard.length===0;
  discardButton.disabled=!canDiscard||!selectedTile;
  const holder=byId('myTiles');holder.replaceChildren();const tiles=new Map(state.hand.map(t=>[t.id,t]));
- for(const id of rackOrder){const tile=tiles.get(id);if(!tile)continue;
-  const b=document.createElement('button');b.type='button';b.className='okey-tile color'+tile.color+(id===selectedTile?' selected':'');b.textContent=tile.color===4?'★':String(tile.n);b.title='Taşı seç veya yerini değiştir';b.draggable=true;
-  b.addEventListener('click',()=>{if(selectedTile&&selectedTile!==id){reorderLocal(selectedTile,id);selectedTile=null;}else{selectedTile=selectedTile===id?null:id;}renderOkey();});
-  b.addEventListener('dragstart',e=>{e.dataTransfer.setData('text/plain',id);e.dataTransfer.effectAllowed='move';});
-  b.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='move';});
-  b.addEventListener('drop',e=>{e.preventDefault();const dragged=e.dataTransfer.getData('text/plain');if(ids.has(dragged)){reorderLocal(dragged,id);selectedTile=null;renderOkey();}});
+ for(let slot=0;slot<30;slot++){
+  const id=rackOrder[slot],tile=tiles.get(id);
+  const b=document.createElement('button');b.type='button';b.className=tile?'okey-tile color'+tile.color+(id===selectedTile?' selected':''):'rack-empty';
+  b.textContent=tile?(tile.color===4?'★':String(tile.n)):'';
+  b.setAttribute('aria-label',tile?`Taş ${tile.n||'sahte okey'}, yuva ${slot+1}`:`Boş yuva ${slot+1}`);
+  b.draggable=!!tile;
+  b.addEventListener('click',()=>{
+   if(selectedTile && selectedTile!==id){const from=rackOrder.indexOf(selectedTile);if(from>=0){rackOrder[from]=id||null;rackOrder[slot]=selectedTile;saveRack();}selectedTile=null;}
+   else if(tile){selectedTile=selectedTile===id?null:id;}
+   renderOkey();
+  });
+  if(tile)b.addEventListener('dragstart',e=>{e.dataTransfer.setData('text/plain',id);e.dataTransfer.effectAllowed='move';});
+  b.addEventListener('dragover',e=>e.preventDefault());
+  b.addEventListener('drop',e=>{e.preventDefault();const dragged=e.dataTransfer.getData('text/plain');const from=rackOrder.indexOf(dragged);if(from<0)return;rackOrder[from]=rackOrder[slot]||null;rackOrder[slot]=dragged;selectedTile=null;saveRack();renderOkey();});
   holder.append(b);
  }
 }
@@ -65,14 +73,14 @@ const tableTiles=byId('tableTiles');
 function renderTableTiles(g){
  tableTiles.replaceChildren();
  const section=(label,tiles)=>{const div=document.createElement('div');div.className='table-pile';const title=document.createElement('strong');title.textContent=label;div.append(title);for(const t of tiles){const span=document.createElement('span');span.className='mini-tile color'+t.color;span.textContent=t.color===4?'★':t.n;div.append(span);}tableTiles.append(div);};
- section(`Ortadaki taşlar: ${g.wall}`,[]);section('Gösterge',g.indicator?[g.indicator]:[]);
+ section(`ÇEKİLECEK TAŞLAR • ${g.wall}`,[]);section('GÖSTERGE',g.indicator?[g.indicator]:[]);
  for(let i=0;i<4;i++)section(`${i+1}. oyuncunun attıkları`,g.discardBySeat?.[i]||[]);
 }
 const showButton=document.createElement('button');showButton.className='outline';showButton.textContent='Göstergeyi göster (−1)';actionBar.append(showButton);
 showButton.addEventListener('click',()=>send({type:'showIndicator'}));
 const sortRun=document.createElement('button'),sortPer=document.createElement('button');
 sortRun.textContent='Seri diz';sortPer.textContent='Per diz';sortRun.className=sortPer.className='outline';actionBar.append(sortRun,sortPer);
-function autoSort(kind){const g=roomDetail?.gameState;if(!g)return;const idx=new Map(rackOrder.map((id,i)=>[id,i]));const sorted=[...g.hand].sort((a,b)=>kind==='run'?(a.color-b.color||a.n-b.n):(a.n-b.n||a.color-b.color));rackOrder=sorted.map(t=>t.id);selectedTile=null;saveRack();renderOkey();}
+function autoSort(kind){const g=roomDetail?.gameState;if(!g)return;const idx=new Map(rackOrder.map((id,i)=>[id,i]));const sorted=[...g.hand].sort((a,b)=>kind==='run'?(a.color-b.color||a.n-b.n):(a.n-b.n||a.color-b.color));rackOrder=sorted.map(t=>t.id);while(rackOrder.length<30)rackOrder.push(null);selectedTile=null;saveRack();renderOkey();}
 sortRun.addEventListener('click',()=>autoSort('run'));sortPer.addEventListener('click',()=>autoSort('per'));
 const oldRender=renderOkey;
 renderOkey=function(){oldRender();const g=roomDetail?.gameState;showButton.disabled=!(g&&roomDetail?.settings?.showIndicator&&g.roundStatus==='playing'&&g.hand.some(t=>t.color===g.indicator?.color&&t.n===g.indicator?.n));};

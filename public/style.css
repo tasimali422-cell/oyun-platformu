@@ -59,3 +59,32 @@
  .tombala-room .tombala-area{order:0}
  .tombala-room .table-inner{order:5}
 }
+
+/* v1.1 - premium Okey masasi; Tombala arayuzunu etkilemez */
+.okey-room .room-layout{display:flex;flex-direction:column;gap:12px;max-width:1450px;margin:auto}
+.okey-room .premium-table{background:linear-gradient(135deg,#8d522e,#362018 18%,#aa7041 50%,#291b15);border:8px solid #9a663b;border-radius:30px;padding:15px;box-shadow:0 20px 65px #0009,inset 0 0 0 2px #d19a56}
+.okey-room .table-inner{height:auto;min-height:690px;display:flex;flex-direction:column;justify-content:flex-start;gap:12px;border-radius:60px;padding:24px;background:radial-gradient(ellipse at center,#155d69,#07334a 72%,#05202f);box-shadow:inset 0 0 0 6px #183d49,inset 0 0 55px #000a}
+.okey-room .table-insignia{display:none}
+.okey-room #seats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:center;order:0}
+.okey-room #seats .seat{min-width:0;background:linear-gradient(#112b42,#071b2d);border:1px solid #b3864e;border-radius:16px;box-shadow:0 7px 15px #0006;padding:10px}
+.okey-room #seats .seat-avatar{background:#e1b977;color:#14263b;border:2px solid #e9d0a1}
+.okey-room .room-message{order:1;flex:none;color:#e5d2a9;background:#061c2dc9;border-radius:9px;padding:9px}
+.okey-room .okey-area{order:2;width:100%;background:transparent;border:0;box-shadow:none;padding:4px;display:flex;flex-direction:column;gap:12px}
+.okey-room .okey-state{order:0;background:#081d2ccc;border:1px solid #406c77;border-radius:10px;padding:10px;text-align:center}
+.okey-room .table-tiles{order:1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:10px 0;min-height:130px}
+.okey-room .table-pile{background:linear-gradient(#103b4b,#092636);border:1px solid #7d997e;border-radius:13px;text-align:center;padding:12px;min-height:88px}
+.okey-room .table-pile strong{color:#e3c58f;letter-spacing:.6px}
+.okey-room .rack-label{order:2;margin:10px 0 0;color:#f5d3a0;font-size:12px;font-weight:700}
+.okey-room .my-tiles{order:3;display:grid;grid-template-columns:repeat(15,minmax(0,1fr));grid-template-rows:repeat(2,62px);gap:6px 3px;max-width:1040px;width:100%;align-self:center;overflow:visible;min-height:164px;padding:18px 15px 23px;border:9px solid #422416;border-bottom:17px solid #402213;border-top:8px solid #bf824d;background:linear-gradient(180deg,#6b361b 0%,#b57e50 7%,#5a2f1a 12%,#542a18 46%,#d19a66 48%,#532a19 55%,#4e2916 92%,#b07548 98%);box-shadow:inset 0 7px 10px #0009,0 18px 25px #0008;border-radius:9px 9px 19px 19px}
+.okey-room .my-tiles .okey-tile{height:59px;max-width:45px;width:100%;font-size:22px;touch-action:manipulation}
+.okey-room .my-tiles .rack-empty{height:59px;width:100%;border:1px dashed #c8a07830;border-radius:4px;background:#2d150c22;cursor:pointer}
+.okey-room .my-tiles .rack-empty:hover{background:#ddad6c3b}
+.okey-room .okey-actions{order:5;justify-content:center;gap:10px}
+.okey-room .okey-actions button{padding:12px 15px;border-radius:11px;background:#0c314b;color:#ecf4fa;border:1px solid #377ca1;font-weight:750;cursor:pointer}
+.okey-room .okey-actions #discardSelected{background:linear-gradient(#b43c3c,#842329);border-color:#df7b71}
+.okey-room .okey-actions #drawWall{background:linear-gradient(#16699d,#0a446a)}
+.okey-room .tile-help{order:6;text-align:center}
+.okey-room .table-chat{min-height:0;max-height:290px;padding:15px 20px;background:#071c2cf5;border:1px solid #446e85;border-radius:16px;display:flex}
+.okey-room .chat-messages{min-height:90px;max-height:115px;overflow:auto;margin:8px 0}
+.okey-room .chatline{padding:5px 0}
+@media(max-width:680px){.okey-room .premium-table{padding:5px;border-width:4px}.okey-room .table-inner{min-height:0;padding:10px 5px;border-radius:20px}.okey-room #seats{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.okey-room .table-tiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}.okey-room .table-pile{padding:6px;min-height:65px}.okey-room .my-tiles{grid-template-rows:repeat(2,34px);min-height:104px;padding:9px 3px 15px;border-width:5px;gap:4px 1px}.okey-room .my-tiles .okey-tile,.okey-room .my-tiles .rack-empty{height:32px;font-size:12px;min-width:0}.okey-room .okey-actions{gap:5px}.okey-room .okey-actions button{padding:8px;font-size:11px}.okey-room .table-chat{padding:10px;max-height:230px}}
