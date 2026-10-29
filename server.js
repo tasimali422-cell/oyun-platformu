@@ -30,7 +30,7 @@ function tiles(){
 }
 function gameState(room,ws){if(!room.round)return null;const g=room.round;const idx=g.order.indexOf(ws);if(idx<0)return null;return {mySeat:idx+1,hand:g.hands[idx],turn:g.turn+1,phase:g.phase,wall:g.wall.length,discard:g.discard.slice(-24).map(t=>({...t})),indicator:g.indicator,discardBySeat:g.discardBySeat.map(a=>a.slice(-6)),roundStatus:g.status,notice:g.notice,joker:{color:g.indicator.color,n:g.indicator.n%13+1},score:room.scores||null};}
 function beginOkey(room){const deck=tiles();const order=[...room.players];const indicatorIndex=deck.findIndex(t=>t.color<4);const indicator=deck.splice(indicatorIndex,1)[0];const hands=order.map((_,i)=>deck.splice(0,i===0?15:14));room.round={order,hands,indicator,wall:deck,discard:[],discardBySeat:[[],[],[],[]],turn:0,phase:'discard',status:'playing',notice:'İlk oyuncu taş atacak.',deadline:Date.now()+room.settings.turnSeconds*1000,shownBy:[]};}
-function notifyRoom(room){const seats=[...room.players].map((ws,i)=>({seat:i+1,name:clients.get(ws)?.name||'Misafir',host:ws===room.host,online:clients.get(ws)?.active!==false,score:room.scores?.[i]??0}));for(const ws of room.players)send(ws,{type:'room',...view(room),seats,host:ws===room.host,chat:room.chat,gameState:gameState(room,ws),tombala:userView(room,ws)});}
+function notifyRoom(room){const seats=[...room.players].map((ws,i)=>({seat:i+1,name:clients.get(ws)?.name||'Misafir',host:ws===room.host,online:clients.get(ws)?.active!==false,score:room.scores?.[i]??0,playerId:clients.get(ws)?.token||null}));for(const ws of room.players)send(ws,{type:'room',...view(room),seats,host:ws===room.host,chat:room.chat,gameState:gameState(room,ws),tombala:userView(room,ws)});}
 function leave(ws){const state=clients.get(ws);if(!state?.room)return;const room=rooms.get(state.room);state.room=null;if(!room)return;room.players.delete(ws);room.ticketChoices?.delete(ws);room.autoChoices?.delete(ws);if(room.tombala){room.tombala.tickets.delete(ws);room.tombala.auto.delete(ws);room.tombala.manualMarks.delete(ws);}if(!room.players.size){rooms.delete(room.id);}else{if(room.host===ws)room.host=room.players.values().next().value;if(room.round){room.round.status='stopped';room.round.notice='Oyuncu masadan ayrıldı. Yeni el için masa yeniden kurulmalı.';room.started=false;room.round=null;}notifyRoom(room);}}
 function dropDisconnected(ws){const u=clients.get(ws);if(!u||u.active)return;const token=u.token;if(token)reconnectTokens.delete(token);leave(ws);clients.delete(ws);broadcast();}
 const server = http.createServer((req,res)=>{
@@ -69,6 +69,18 @@ wss.on('connection',ws=>{
       leave(ws);room.players.add(ws);if(room.game==='tombala'){room.ticketChoices.set(ws,1);room.autoChoices.set(ws,false);}user.room=room.id;send(ws,{type:'joined',room:room.id});notifyRoom(room);broadcast();
     } else if(data.type==='leave'){
       leave(ws);send(ws,{type:'left'});broadcast();
+    } else if(data.type==='private_chat'){
+      const room=rooms.get(user.room);
+      if(!room || !room.players.has(ws))return send(ws,{type:'error',message:'Özel mesaj için aynı masada olmalısınız.'});
+      const targetToken=clean(data.target,100);
+      const recipient=[...room.players].find(peer=>peer!==ws && clients.get(peer)?.token===targetToken && clients.get(peer)?.active!==false);
+      if(!recipient)return send(ws,{type:'error',message:'Oyuncu çevrimdışı veya bu masada değil.'});
+      if(Date.now()-user.lastChat<1200)return send(ws,{type:'error',message:'Mesaj göndermeden önce biraz bekle.'});
+      const message=clean(data.message,240);if(!message)return;
+      user.lastChat=Date.now();
+      const recipientName=clients.get(recipient)?.name||'Oyuncu';
+      const packet={type:'private_message',from:user.token,fromName:user.name,to:targetToken,toName:recipientName,message,time:Date.now()};
+      send(ws,packet);send(recipient,packet);
     } else if(data.type==='chat'){
       const room=rooms.get(user.room);if(!room)return;
       if(Date.now()-user.lastChat<850)return send(ws,{type:'error',message:'Biraz yavaş yaz.'});
