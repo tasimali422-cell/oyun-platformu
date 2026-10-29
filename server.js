@@ -17,10 +17,10 @@ const REJOIN_MS=5*60*1000;
 const MAX_ROOM_IDLE_MS=60*60*1000;
 const TURN_CHOICES=[15,20,30,45,60,90];
 const GAMES = new Set(['tombala','okey','101','kelime','bilardo','langirt']);
-const maxFor = game => game==='tombala'?TOMBALA_MAX_PLAYERS:['kelime','bilardo','langirt'].includes(game)?2:4;
+const maxFor = (game, room) => game==='tombala' ? (room?.settings?.maxPlayers || 12) : ['kelime','bilardo','langirt'].includes(game)?2:4;
 const clean = (value, max=36) => String(value ?? '').replace(/[\u0000-\u001f\u007f]/g,' ').trim().slice(0,max);
 const send = (ws, data) => {if(ws.readyState===WebSocket.OPEN) ws.send(JSON.stringify(data));};
-function view(room){return {id:room.id,game:room.game,name:room.name,players:room.players.size,max:maxFor(room.game),created:room.created,started:room.started,settings:room.settings||null,remainingMs:room.round?.deadline?Math.max(0,room.round.deadline-Date.now()):null,scores:room.scores||null,finalResult:room.finalResult||null,tombalaPhase:room.tombala?.phase||null};}
+function view(room){return {id:room.id,game:room.game,name:room.name,players:room.players.size,max:maxFor(room.game,room),created:room.created,started:room.started,settings:room.settings||null,remainingMs:room.round?.deadline?Math.max(0,room.round.deadline-Date.now()):null,scores:room.scores||null,finalResult:room.finalResult||null,tombalaPhase:room.tombala?.phase||null};}
 function list(){return [...rooms.values()].map(view);}
 function broadcast(){const packet=JSON.stringify({type:'state',online:clients.size,rooms:list()});for(const ws of clients.keys())if(ws.readyState===WebSocket.OPEN)ws.send(packet);}
 function tiles(){
@@ -60,12 +60,12 @@ wss.on('connection',ws=>{
       const current=clients.get(ws);current.name=clean(data.name,20)||'Misafir';const room=rooms.get(current.room);if(room)notifyRoom(room);
     } else if(data.type==='create'){
       if(!GAMES.has(data.game)||rooms.size>=100)return send(ws,{type:'error',message:'Masa oluşturulamadı.'});
-      leave(ws);const settings={lossLimit:Math.max(1,Math.min(30,Number(data.startPoints)||20)),showIndicator:data.showIndicator!==false,turnSeconds:TURN_CHOICES.includes(Number(data.turnSeconds))?Number(data.turnSeconds):30};const room={id:randomUUID().slice(0,8),game:data.game,name:clean(data.name)||'Yeni masa',players:new Set([ws]),host:ws,created:Date.now(),started:false,chat:[],settings,scores:null,finalResult:null,scoreByToken:{},roundResults:[],ticketChoices:new Map(),autoChoices:new Map()};if(room.game==='tombala'){room.settings.drawInterval=30000;setupTombala(room);room.ticketChoices.set(ws,Math.max(1,Math.min(12,Number(data.ticketCount)||1)));room.autoChoices.set(ws,false);}rooms.set(room.id,room);user.room=room.id;send(ws,{type:'joined',room:room.id});notifyRoom(room);broadcast();
+      leave(ws);const settings={lossLimit:Math.max(1,Math.min(30,Number(data.startPoints)||20)),showIndicator:data.showIndicator!==false,turnSeconds:TURN_CHOICES.includes(Number(data.turnSeconds))?Number(data.turnSeconds):30};const room={id:randomUUID().slice(0,8),game:data.game,name:clean(data.name)||'Yeni masa',players:new Set([ws]),host:ws,created:Date.now(),started:false,chat:[],settings,scores:null,finalResult:null,scoreByToken:{},roundResults:[],ticketChoices:new Map(),autoChoices:new Map()};if(room.game==='tombala'){room.settings.drawInterval=Math.max(5000,Math.min(120000,Math.round(Number(data.drawInterval)||30000)));room.settings.maxPlayers=Math.max(2,Math.min(24,Math.round(Number(data.maxPlayers)||12)));room.settings.ticketCost=Math.max(0,Math.min(10000,Math.round(Number(data.ticketCost ?? 100))));room.settings.prize1=Math.max(0,Math.min(1000000,Math.round(Number(data.prize1 ?? 500))));room.settings.prize2=Math.max(0,Math.min(1000000,Math.round(Number(data.prize2 ?? 1000))));room.settings.prize3=Math.max(0,Math.min(1000000,Math.round(Number(data.prize3 ?? 2500))));setupTombala(room);room.ticketChoices.set(ws,Math.max(1,Math.min(12,Number(data.ticketCount)||1)));room.autoChoices.set(ws,false);}rooms.set(room.id,room);user.room=room.id;send(ws,{type:'joined',room:room.id});notifyRoom(room);broadcast();
     } else if(data.type==='join'){
       const room=rooms.get(clean(data.id,16));if(!room)return send(ws,{type:'error',message:'Masa bulunamadı.'});
       if(user.room===room.id){send(ws,{type:'joined',room:room.id});notifyRoom(room);return;}
       if(room.started)return send(ws,{type:'error',message:'Bu masa başlamış.'});
-      if(room.players.size>=maxFor(room.game))return send(ws,{type:'error',message:'Masa dolu.'});
+      if(room.players.size>=maxFor(room.game,room))return send(ws,{type:'error',message:'Masa dolu.'});
       leave(ws);room.players.add(ws);if(room.game==='tombala'){room.ticketChoices.set(ws,1);room.autoChoices.set(ws,false);}user.room=room.id;send(ws,{type:'joined',room:room.id});notifyRoom(room);broadcast();
     } else if(data.type==='leave'){
       leave(ws);send(ws,{type:'left'});broadcast();
@@ -152,4 +152,4 @@ setInterval(()=>{
     notifyRoom(room);broadcast();
   }
 },1000).unref();
-server.listen(port,'0.0.0.0',()=>console.log(`Game room tombala v0.7 listening on ${port}`));
+server.listen(port,'0.0.0.0',()=>console.log(`Game room tombala v0.9 listening on ${port}`));

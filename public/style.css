@@ -38,3 +38,5 @@
 .tombala-room .ticket-cell:disabled:not(.ticket-blank){opacity:1}
 .tombala-room .ticket-marked{background:#217a55!important;color:#fff!important}
 @media(max-width:650px){.tombala-room .room-layout{display:flex!important}.tombala-room .tombala-stage{top:0;border-radius:12px;padding:10px}.tombala-room .tombala-ball{width:86px;height:86px;font-size:2.9rem}.tombala-room .tombala-tickets{grid-template-columns:1fr}.tombala-room #seats{grid-template-columns:repeat(2,minmax(0,1fr))!important}.tombala-room .ticket-cell{min-height:30px;font-size:15px}.tombala-room .table-chat{min-width:0}}
+
+#tombalaRoomSettings[hidden],#tombalaIntervalRow[hidden]{display:none!important}#tombalaRoomSettings label{display:block;margin-block:10px}#tombalaRoomSettings input,#tombalaRoomSettings select{width:100%}#tombalaRules{padding:8px 0;color:#d7bd8d;font-size:.88rem}
