@@ -14,7 +14,7 @@ function showRoom(){if(!joined||!roomDetail)return;byId('lobbyPage').hidden=true
  byId('tableSettings').textContent=roomDetail.game==='okey'?`Başlangıç: 0 • Eksi limit: -${roomDetail.settings?.lossLimit||20} • Gösterge cezası: ${roomDetail.settings?.showIndicator?'açık':'kapalı'} • Puanlar: ${(roomDetail.scores||[0,0,0,0]).join(' / ')}`:'';renderOkey();const feed=byId('chatMessages');feed.replaceChildren();for(const m of roomDetail.chat||[]){const line=document.createElement('div');line.className='chatline';const name=document.createElement('b');name.textContent=m.name+': ';const msg=document.createElement('span');msg.textContent=m.message;line.append(name,msg);feed.append(line);}feed.scrollTop=feed.scrollHeight;
 }
 function connect(){const protocol=location.protocol==='https:'?'wss:':'ws:';socket=new WebSocket(`${protocol}//${location.host}`);socket.onopen=()=>{connected=true;byId('dot').classList.add('good');byId('connection').textContent='Canlı bağlantı';const token=sessionStorage.getItem(identityKey)||crypto.randomUUID();sessionStorage.setItem(identityKey,token);send({type:'resume',token});send({type:'profile',name:byId('nickname').value});};socket.onclose=()=>{connected=false;reconnecting=true;byId('dot').classList.remove('good');byId('connection').textContent='Bağlanıyor...';render();clearTimeout(retry);retry=setTimeout(connect,2500);};socket.onmessage=e=>{let d;try{d=JSON.parse(e.data);}catch{return;}if(d.type==='state'){rooms=d.rooms;byId('online').textContent=d.online;render();}else if(d.type==='session'){sessionStorage.setItem(identityKey,d.token);}else if(d.type==='resumed'){reconnecting=false;if(d.room){joined=d.room;}else{joined=null;roomDetail=null;byId('roomPage').hidden=true;byId('lobbyPage').hidden=false;}}else if(d.type==='joined'){joined=d.room;toast('Masaya katıldın.');render();}else if(d.type==='room'){roomDetail=d;joined=d.id;showRoom();}else if(d.type==='left'){joined=null;roomDetail=null;byId('roomPage').hidden=true;byId('lobbyPage').hidden=false;toast('Masadan ayrıldın.');render();}else if(d.type==='error')toast(d.message);};}
-byId('openCreate').addEventListener('click',()=>byId('createDialog').showModal());byId('closeDialog').addEventListener('click',()=>byId('createDialog').close());byId('createForm').addEventListener('submit',e=>{e.preventDefault();send({type:'create',game:byId('gameSelect').value,name:byId('roomName').value,startPoints:Number(byId('startingScore').value),showIndicator:byId('indicatorEnabled').checked});byId('createDialog').close();byId('roomName').value='';});
+byId('openCreate').addEventListener('click',()=>byId('createDialog').showModal());byId('closeDialog').addEventListener('click',()=>byId('createDialog').close());byId('createForm').addEventListener('submit',e=>{e.preventDefault();send({type:'create',game:byId('gameSelect').value,name:byId('roomName').value,startPoints:Number(byId('startingScore').value),showIndicator:byId('indicatorEnabled').checked,turnSeconds:Number(byId('turnSeconds').value)});byId('createDialog').close();byId('roomName').value='';});
 byId('leaveRoom').addEventListener('click',()=>send({type:'leave'}));byId('startGame').addEventListener('click',()=>send({type:'start'}));byId('chatForm').addEventListener('submit',e=>{e.preventDefault();const input=byId('chatInput');if(!input.value.trim())return;send({type:'chat',message:input.value});input.value='';});byId('nickname').addEventListener('change',()=>{const name=byId('nickname').value.trim().slice(0,20)||'Misafir';byId('nickname').value=name;sessionStorage.setItem('demoName',name);send({type:'profile',name});});connect();
 
 // v0.3.1: Local rack ordering, independent from the authoritative discard action.
@@ -22,21 +22,22 @@ let rackOrder=[], selectedTile=null, lastRoomKey=null;
 const actionBar=byId('okeyArea').querySelector('.okey-actions');
 const discardButton=document.createElement('button');discardButton.id='discardSelected';discardButton.className='primary';discardButton.type='button';discardButton.textContent='Seçili taşı at';actionBar.append(discardButton);
 const sortingTip=document.createElement('small');sortingTip.className='tile-help';sortingTip.textContent='Taşları sürükleyerek diz veya önce bir taşa, sonra yerleştireceğin taşa dokun. Taş atmak için ayrıca “Seçili taşı at” düğmesini kullan.';byId('myTiles').after(sortingTip);
+function saveRack(){if(lastRoomKey)try{localStorage.setItem('rack_'+lastRoomKey,JSON.stringify(rackOrder));}catch{}}
 function reorderLocal(id,beforeId){
  if(id===beforeId)return;
  const updated=rackOrder.filter(v=>v!==id);const to=updated.indexOf(beforeId);
  if(to<0)updated.push(id);else updated.splice(to,0,id);
- rackOrder=updated;renderOkey();
+ rackOrder=updated;saveRack();renderOkey();
 }
 function renderOkey(){
  const el=byId('okeyArea');const state=roomDetail?.gameState;
  el.hidden=roomDetail?.game!=='okey'||!state;
  if(el.hidden){selectedTile=null;lastRoomKey=null;return;}
- const key=roomDetail.id;if(lastRoomKey!==key){rackOrder=[];selectedTile=null;lastRoomKey=key;}
+ const key=roomDetail.id;if(lastRoomKey!==key){rackOrder=[];selectedTile=null;lastRoomKey=key;try{rackOrder=JSON.parse(localStorage.getItem('rack_'+key)||'[]');}catch{rackOrder=[];}}
  const ids=new Set(state.hand.map(t=>t.id));rackOrder=rackOrder.filter(id=>ids.has(id));for(const t of state.hand)if(!rackOrder.includes(t.id))rackOrder.push(t.id);
  if(selectedTile&&!ids.has(selectedTile))selectedTile=null;
  const mine=state.turn===state.mySeat;const canDraw=mine&&state.phase==='draw'&&state.roundStatus==='playing';const canDiscard=mine&&state.phase==='discard'&&state.roundStatus==='playing';
- byId('okeyStatus').textContent=`${state.notice} • ${mine?'SIRA SENDE':'Rakibin sırası'} • Ortada ${state.wall} taş`;
+ renderTableTiles(state);byId('okeyStatus').textContent=`${state.notice} • ${mine?'SIRA SENDE':'Rakibin sırası'} • Ortada ${state.wall} taş`;
  byId('drawWall').disabled=!canDraw||state.wall===0;
  byId('drawDiscard').disabled=!canDraw||state.discard.length===0;
  discardButton.disabled=!canDiscard||!selectedTile;
@@ -58,3 +59,20 @@ const finishButton=document.createElement('button');finishButton.id='finishHand'
 finishButton.addEventListener('click',()=>{if(selectedTile)send({type:'finish',id:selectedTile});else toast('Önce bitişte atacağın taşı seç.');});
 const previousRender=renderOkey;
 renderOkey=function(){previousRender();const g=roomDetail?.gameState;finishButton.disabled=!(g&&g.turn===g.mySeat&&g.phase==='discard'&&g.hand.length===15&&selectedTile);};
+
+// v0.6: indicator, four discard piles and the remaining wall are visible to every player.
+const tableTiles=byId('tableTiles');
+function renderTableTiles(g){
+ tableTiles.replaceChildren();
+ const section=(label,tiles)=>{const div=document.createElement('div');div.className='table-pile';const title=document.createElement('strong');title.textContent=label;div.append(title);for(const t of tiles){const span=document.createElement('span');span.className='mini-tile color'+t.color;span.textContent=t.color===4?'★':t.n;div.append(span);}tableTiles.append(div);};
+ section(`Ortadaki taşlar: ${g.wall}`,[]);section('Gösterge',g.indicator?[g.indicator]:[]);
+ for(let i=0;i<4;i++)section(`${i+1}. oyuncunun attıkları`,g.discardBySeat?.[i]||[]);
+}
+const showButton=document.createElement('button');showButton.className='outline';showButton.textContent='Göstergeyi göster (−1)';actionBar.append(showButton);
+showButton.addEventListener('click',()=>send({type:'showIndicator'}));
+const sortRun=document.createElement('button'),sortPer=document.createElement('button');
+sortRun.textContent='Seri diz';sortPer.textContent='Per diz';sortRun.className=sortPer.className='outline';actionBar.append(sortRun,sortPer);
+function autoSort(kind){const g=roomDetail?.gameState;if(!g)return;const idx=new Map(rackOrder.map((id,i)=>[id,i]));const sorted=[...g.hand].sort((a,b)=>kind==='run'?(a.color-b.color||a.n-b.n):(a.n-b.n||a.color-b.color));rackOrder=sorted.map(t=>t.id);selectedTile=null;saveRack();renderOkey();}
+sortRun.addEventListener('click',()=>autoSort('run'));sortPer.addEventListener('click',()=>autoSort('per'));
+const oldRender=renderOkey;
+renderOkey=function(){oldRender();const g=roomDetail?.gameState;showButton.disabled=!(g&&roomDetail?.settings?.showIndicator&&g.roundStatus==='playing'&&g.hand.some(t=>t.color===g.indicator?.color&&t.n===g.indicator?.n));};
