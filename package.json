@@ -1,6 +1,6 @@
 {
   "name": "oyun-platformu",
-  "version": "1.0.0-okey-rules",
+  "version": "1.4.0",
   "private": true,
   "type": "module",
   "scripts": {

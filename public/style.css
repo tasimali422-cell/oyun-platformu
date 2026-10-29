@@ -175,3 +175,52 @@ body.active-okey-match main{max-width:none!important;margin:auto!important;width
  .scoreboard-dock{left:7px;bottom:7px}.scoreboard-dock>button{font-size:11px;padding:7px 9px}
  .private-panel{right:7px;bottom:7px;height:min(310px,48vh)}
 }
+
+/* v1.4: entering ANY table hides the lobby navigation, regardless of match state */
+body.inside-game-room .sidebar{display:none!important}
+body.inside-game-room .shell{display:block!important}
+body.inside-game-room main{width:100%!important;max-width:1600px!important;margin:0 auto!important}
+/* Mülk Turu has its own independent game arena; room chat remains below the board */
+.mulk-room .room-layout{display:flex!important;flex-direction:column;gap:16px}
+.mulk-room .mulk-area{width:100%;order:0;min-width:0;display:block}
+.mulk-room .premium-table{order:1;display:none}
+.mulk-room .table-chat{order:2;position:static;display:flex;width:100%;max-height:320px;min-height:190px}
+.mulk-area{padding:14px;background:linear-gradient(150deg,#0a2533,#0e2329);border:1px solid #477078;border-radius:16px}
+.mulk-info{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}
+.mulk-info h2{font-size:clamp(20px,3vw,30px);margin:4px 0}
+.mulk-eyebrow{font-size:11px;letter-spacing:2px;color:#a6d7b8;font-weight:800}
+.mulk-roll{background:#173d48;border:1px solid #5a9592;padding:12px 18px;border-radius:12px;font-size:22px;font-weight:800}
+.mulk-board{display:grid;grid-template-columns:repeat(11,minmax(0,1fr));grid-template-rows:repeat(11,minmax(0,1fr));aspect-ratio:1;background:radial-gradient(circle at center,#376f71,#16474d);border:7px solid #905b39;border-radius:17px;padding:4px;box-shadow:0 15px 45px #0008,inset 0 0 0 2px #c48f5d;max-width:min(100%,790px);margin:auto}
+.mulk-square{border:1px solid #8ca7a3;background:#eef1e5;color:#162c37;min-width:0;min-height:0;padding:2px;display:flex;flex-direction:column;align-items:center;justify-content:space-between;gap:2px;position:relative;cursor:pointer;overflow:hidden;text-align:center}
+.mulk-square.selected{outline:3px solid #ffd56f;outline-offset:-3px;z-index:2}
+.mulk-square .colorband{height:12%;width:100%;background:var(--square-color,#bfd8ca);flex:none}
+.mulk-square .sq-label{font-size:clamp(5px,0.85vw,11px);font-weight:800;line-height:1.12;overflow-wrap:anywhere}
+.mulk-square .sq-price{font-size:clamp(5px,0.75vw,10px);color:#38515b;font-weight:700}
+.mulk-square .tokens{display:flex;gap:1px;flex-wrap:wrap;align-items:center;justify-content:center}
+.mulk-square .token{width:clamp(7px,1.3vw,15px);height:clamp(7px,1.3vw,15px);border-radius:100%;border:2px solid #fff;background:var(--token-color);box-shadow:0 1px 3px #3339}
+.mulk-square .owner-dot{position:absolute;top:2px;right:2px;background:#172e34;color:#fff;font-size:9px;padding:1px 3px;border-radius:6px}
+.mulk-board-center{grid-column:2/11;grid-row:2/11;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:14px;min-width:0}
+.mulk-board-center h2{font-size:clamp(24px,5vw,50px);margin:0;color:#f8e6c6}
+.mulk-board-center p{margin:0;color:#b8d8d7}
+.mulk-events{width:min(100%,460px);height:140px;overflow:auto;text-align:left;background:#062e38b8;border:1px solid #ffffff28;border-radius:10px;padding:10px;font-size:12px;line-height:1.7}
+.mulk-event{border-bottom:1px solid #ffffff1a;padding:3px 0}
+.mulk-players{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:9px;margin:14px 0}
+.mulk-player{border:1px solid #477a76;border-radius:10px;background:#112f3b;padding:12px}
+.mulk-player.turn{border-color:#e3b56b;box-shadow:inset 0 0 0 1px #e3b56b}
+.mulk-player b{display:block;margin-bottom:4px}.mulk-player small{color:#bed8d5}
+.mulk-actions{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
+.mulk-actions button,.mulk-controls button,.mulk-trade button{border:1px solid #48828b;background:#166075;color:#fff;padding:11px 14px;border-radius:9px;cursor:pointer;font-weight:700}
+.mulk-actions button:disabled{opacity:.4;cursor:not-allowed}
+.mulk-property-controls{display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;border:1px solid #3b686b;background:#0b202b;border-radius:12px;padding:14px;margin-bottom:12px}
+.mulk-property-controls p{color:#b7c8ca;font-size:12px;max-width:550px;line-height:1.5}
+.mulk-controls{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.mulk-trade{background:#0b2834;border:1px solid #315967;padding:13px;border-radius:12px}
+.mulk-trade summary{cursor:pointer;font-weight:800}
+.mulk-trade-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin:8px 0}
+.mulk-trade-fields label{font-size:12px;color:#bdd1ce}
+.mulk-trade-fields input,.mulk-trade-fields select,.mulk-bid-input{width:100%;margin-top:4px;background:#112e3b;color:#fff;border:1px solid #477078;border-radius:8px;padding:9px}
+#mulkTradePending{font-size:12px;color:#f5d48d;padding:9px 0}
+@media(max-width:700px){.mulk-board{border-width:4px;padding:2px}.mulk-square{padding:1px}.mulk-square .sq-label{font-size:clamp(4px,1.65vw,8px)}.mulk-square .sq-price{font-size:clamp(4px,1.5vw,8px)}.mulk-square .colorband{min-height:3px}.mulk-square .owner-dot{font-size:6px}.mulk-info{align-items:flex-start}.mulk-roll{font-size:14px;padding:9px}.mulk-board-center h2{font-size:18px}.mulk-board-center p{font-size:9px}.mulk-events{height:100px;font-size:9px;padding:4px}.mulk-area{padding:5px}.mulk-room .table-chat{display:flex;position:static;max-height:290px}.mulk-actions button,.mulk-controls button{font-size:12px;padding:9px}}
+/* Member name opens private chat in every live game, including Mülk Turu. */
+.room-page .seat.messageable{cursor:pointer;outline-offset:2px}
+.room-page .seat.messageable:hover,.room-page .seat.messageable:focus-visible{outline:2px solid #e7be78}
