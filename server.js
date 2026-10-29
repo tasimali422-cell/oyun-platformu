@@ -1,6 +1,7 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer, WebSocket } from 'ws';
 
@@ -10,43 +11,56 @@ const mime = {'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8
 const rooms = new Map();
 const clients = new Map();
 const GAMES = new Set(['tombala','okey','101','kelime','bilardo','langirt']);
-function roomsView(){ return [...rooms.values()].map(({id,game,name,players,created})=>({id,game,name,players:players.size,max: game==='tombala'?24:game==='kelime'?2:game==='bilardo'?2:game==='langirt'?2:4,created})); }
-function send(ws, obj){if(ws.readyState===WebSocket.OPEN)ws.send(JSON.stringify(obj));}
-function broadcast(){const packet=JSON.stringify({type:'state',online:clients.size,rooms:roomsView()});for(const ws of clients.keys())if(ws.readyState===WebSocket.OPEN)ws.send(packet);}
-function leave(ws){const state=clients.get(ws);if(!state?.room)return;const room=rooms.get(state.room);if(room){room.players.delete(ws);if(!room.players.size)rooms.delete(room.id);}state.room=null;}
+const maxFor = game => game==='tombala'?24:['kelime','bilardo','langirt'].includes(game)?2:4;
+const clean = (value, max=36) => String(value ?? '').replace(/[\u0000-\u001f\u007f]/g,' ').trim().slice(0,max);
+const send = (ws, data) => {if(ws.readyState===WebSocket.OPEN) ws.send(JSON.stringify(data));};
+function view(room){return {id:room.id,game:room.game,name:room.name,players:room.players.size,max:maxFor(room.game),created:room.created,started:room.started};}
+function list(){return [...rooms.values()].map(view);}
+function broadcast(){const packet=JSON.stringify({type:'state',online:clients.size,rooms:list()});for(const ws of clients.keys())if(ws.readyState===WebSocket.OPEN)ws.send(packet);}
+function notifyRoom(room){const seats=[...room.players].map((ws,i)=>({seat:i+1,name:clients.get(ws)?.name||'Misafir',host:ws===room.host}));for(const ws of room.players)send(ws,{type:'room',...view(room),seats,host:ws===room.host,chat:room.chat});}
+function leave(ws){const state=clients.get(ws);if(!state?.room)return;const room=rooms.get(state.room);state.room=null;if(!room)return;room.players.delete(ws);if(!room.players.size){rooms.delete(room.id);}else{if(room.host===ws)room.host=room.players.values().next().value;notifyRoom(room);}}
 const server = http.createServer((req,res)=>{
-  const url = new URL(req.url||'/', 'http://localhost');
-  if(url.pathname==='/health'){res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({ok:true}));return;}
-  if(req.method!=='GET'&&req.method!=='HEAD'){res.writeHead(405);res.end();return;}
-  let filename;
-  try {filename=decodeURIComponent(url.pathname);} catch{res.writeHead(400);res.end();return;}
+  const url=new URL(req.url||'/','http://localhost');
+  if(url.pathname==='/health'){res.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify({ok:true}));return;}
+  if(req.method!=='GET'&&req.method!=='HEAD'){res.writeHead(405).end();return;}
+  let filename;try{filename=decodeURIComponent(url.pathname);}catch{res.writeHead(400).end();return;}
   if(filename==='/'||filename==='/index.html')filename='/index.html';
   const full=path.resolve(base,'.'+filename);
-  if(!full.startsWith(base+path.sep)){res.writeHead(403);res.end();return;}
-  fs.stat(full,(err,stat)=>{
-    if(err||!stat.isFile()){res.writeHead(404);res.end('Not found');return;}
-    res.writeHead(200,{'Content-Type':mime[path.extname(full)]||'application/octet-stream','X-Content-Type-Options':'nosniff','Cache-Control':'no-store','Content-Security-Policy':"default-src 'self'; connect-src 'self' ws: wss:; img-src 'self' data:; style-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"});
-    if(req.method==='HEAD'){res.end();return;}fs.createReadStream(full).pipe(res);
-  });
+  if(!full.startsWith(base+path.sep)){res.writeHead(403).end();return;}
+  fs.stat(full,(err,stat)=>{if(err||!stat.isFile()){res.writeHead(404).end('Not found');return;}res.writeHead(200,{'Content-Type':mime[path.extname(full)]||'application/octet-stream','X-Content-Type-Options':'nosniff','Cache-Control':'no-store','Content-Security-Policy':"default-src 'self'; connect-src 'self' ws: wss:; img-src 'self' data:; style-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"});if(req.method==='HEAD'){res.end();return;}fs.createReadStream(full).pipe(res);});
 });
-const wss = new WebSocketServer({server,maxPayload:2048});
-wss.on('connection',(ws)=>{
-  clients.set(ws,{room:null,lastAction:0});send(ws,{type:'hello',message:'Demo ortamına bağlandınız.'});broadcast();
-  ws.on('message',(buf)=>{
-    let data;try{data=JSON.parse(buf.toString())}catch{return;}
-    const user=clients.get(ws);if(!user||Date.now()-user.lastAction<350)return;user.lastAction=Date.now();
-    if(data.type==='create'){
+const wss=new WebSocketServer({server,maxPayload:4096});
+wss.on('connection',ws=>{
+  clients.set(ws,{room:null,name:'Misafir',lastAction:0,lastChat:0});send(ws,{type:'hello',message:'Lobi demosuna bağlandın.'});broadcast();
+  ws.on('message',buf=>{
+    let data;try{data=JSON.parse(buf.toString());}catch{return;}
+    if(!data||typeof data!=='object')return;
+    const user=clients.get(ws);if(!user)return;
+    if(Date.now()-user.lastAction<180)return;user.lastAction=Date.now();
+    if(data.type==='profile'){
+      user.name=clean(data.name,20)||'Misafir';const room=rooms.get(user.room);if(room)notifyRoom(room);
+    } else if(data.type==='create'){
       if(!GAMES.has(data.game)||rooms.size>=100)return send(ws,{type:'error',message:'Masa oluşturulamadı.'});
-      leave(ws);const game=data.game;const name=String(data.name||'Yeni masa').trim().slice(0,36)||'Yeni masa';
-      const id=crypto.randomUUID().slice(0,8);const room={id,game,name,players:new Set([ws]),created:Date.now()};rooms.set(id,room);user.room=id;
-      send(ws,{type:'joined',room:id});broadcast();
+      leave(ws);const room={id:randomUUID().slice(0,8),game:data.game,name:clean(data.name)||'Yeni masa',players:new Set([ws]),host:ws,created:Date.now(),started:false,chat:[]};rooms.set(room.id,room);user.room=room.id;send(ws,{type:'joined',room:room.id});notifyRoom(room);broadcast();
     } else if(data.type==='join'){
-      const room=rooms.get(String(data.id||''));if(!room)return send(ws,{type:'error',message:'Masa bulunamadı.'});
-      const max=room.game==='tombala'?24:['kelime','bilardo','langirt'].includes(room.game)?2:4;
-      if(room.players.size>=max)return send(ws,{type:'error',message:'Masa dolu.'});
-      leave(ws);room.players.add(ws);user.room=room.id;send(ws,{type:'joined',room:room.id});broadcast();
-    } else if(data.type==='leave'){leave(ws);send(ws,{type:'left'});broadcast();}
+      const room=rooms.get(clean(data.id,16));if(!room)return send(ws,{type:'error',message:'Masa bulunamadı.'});
+      if(user.room===room.id){send(ws,{type:'joined',room:room.id});notifyRoom(room);return;}
+      if(room.started)return send(ws,{type:'error',message:'Bu masa başlamış.'});
+      if(room.players.size>=maxFor(room.game))return send(ws,{type:'error',message:'Masa dolu.'});
+      leave(ws);room.players.add(ws);user.room=room.id;send(ws,{type:'joined',room:room.id});notifyRoom(room);broadcast();
+    } else if(data.type==='leave'){
+      leave(ws);send(ws,{type:'left'});broadcast();
+    } else if(data.type==='chat'){
+      const room=rooms.get(user.room);if(!room)return;
+      if(Date.now()-user.lastChat<850)return send(ws,{type:'error',message:'Biraz yavaş yaz.'});
+      user.lastChat=Date.now();const message=clean(data.message,240);if(!message)return;
+      room.chat.push({name:user.name,message,time:Date.now()});room.chat=room.chat.slice(-40);notifyRoom(room);
+    } else if(data.type==='start'){
+      const room=rooms.get(user.room);if(!room||room.host!==ws)return send(ws,{type:'error',message:'Yalnızca masa sahibi başlatabilir.'});
+      if(room.players.size<2)return send(ws,{type:'error',message:'Başlamak için en az iki oyuncu gerekli.'});
+      room.started=true;notifyRoom(room);broadcast();
+    }
   });
   ws.on('close',()=>{leave(ws);clients.delete(ws);broadcast();});ws.on('error',()=>{});
 });
-server.listen(port,'0.0.0.0',()=>console.log(`Game lobby demo listening on ${port}`));
+server.listen(port,'0.0.0.0',()=>console.log(`Game room demo v0.2 listening on ${port}`));

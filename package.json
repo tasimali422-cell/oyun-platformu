@@ -1,6 +1,15 @@
 {
-  "name":"oyun-platformu","version":"0.1.0","private":true,"type":"module",
-  "scripts":{"start":"node server.js"},
-  "engines":{"node":">=22"},
-  "dependencies":{"ws":"^8.18.3"}
+  "name": "oyun-platformu",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "ws": "^8.18.3"
+  }
 }

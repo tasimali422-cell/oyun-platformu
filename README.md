@@ -1,21 +1,16 @@
-# Oyun Platformu — v0.1 demo
+# Oyun Platformu v0.2 — canlı masa odaları (demo)
 
-Gerçek zamanlı oda listesi ve premium mobil uyumlu lobi prototipi.
+Node.js 22, WebSocket (`ws`) ve HTML/CSS/JS ile hazırlanmış erken sürüm.
 
-**Bu sürüm gerçek oyun, kullanıcı üyeliği veya sohbet içermez.** Açılan deneme masaları bellektedir ve sunucu yeniden başlarsa silinir. Redis ve PostgreSQL henüz uygulamaya bağlanmaz.
+## Özellikler
+- Canlı lobi, altı oyun kartı ve masa oluşturma
+- Masa detayına girme, oyuncu koltukları, oda içi sohbet
+- Masa sahibinin en az iki kişiyle demo oturumunu başlatması
+- Telefon ve masaüstü için uyumlu tasarım
+- `/health` sağlık kontrolü ve Dockerfile (3000 portu)
 
-## Coolify kurulumu
+## Sınırlar
+Oyun motorları/taş dağıtma, gerçek kayıt/giriş, moderasyon, veritabanı entegrasyonu ve Redis henüz yoktur. Odalar, oyuncu adları ve sohbet bellektedir; konteyner yeniden başlayınca silinir. Oyuncu adı doğrulanmış hesap değildir. Demo ortamında kişisel bilgi paylaşmayın. Bu sürüm üretimde herkese açık topluluk yayını için uygun değildir.
 
-1. Bu dosyaları GitHub deponun kök dizinine yükle.
-2. Coolify > Project > production > New Resource > Public Git Repository.
-3. Depo URL'ni yapıştır, `main` dalını seç. Build Pack `Dockerfile`, Dockerfile konumu `./Dockerfile`.
-4. Uygulama portunu `3000` olarak ayarla ve domain olarak `https://seovua.com` ekle.
-5. Coolify Proxy ve DNS/HTTPS doğru yapılandırılmışsa Deploy'a bas. `/health` adresi `{"ok":true}` döndürmeli.
-
-## Yerel çalıştırma
-
-Node.js 22+ ile `npm install` ve `npm start`. Uygulama `http://localhost:3000` adresinde çalışır.
-
-## Güvenlik notları
-
-Bu sürümde kimlik doğrulama yoktur: lobi yalnızca geliştirme ve kapalı test içindir, gerçek kullanıcı hizmetine açılmamalıdır. Veritabanı şifrelerini repoya koyma. PostgreSQL ve Redis'i özel erişimde tut. Prod öncesi kullanıcı hesapları, oran sınırlama, moderasyon, giriş kontrolü, yedekleme ve durum kalıcılığı eklenmelidir.
+## Coolify güncelleme
+`main` kök dizininde Dockerfile olmalı. Coolify mevcut Public Git Repository uygulamasında **Redeploy** yapın; yeni kaynak oluşturmayın. `/health` 200 döner.
