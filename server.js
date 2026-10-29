@@ -60,13 +60,13 @@ wss.on('connection',ws=>{
       const current=clients.get(ws);current.name=clean(data.name,20)||'Misafir';const room=rooms.get(current.room);if(room)notifyRoom(room);
     } else if(data.type==='create'){
       if(!GAMES.has(data.game)||rooms.size>=100)return send(ws,{type:'error',message:'Masa oluşturulamadı.'});
-      leave(ws);const settings={lossLimit:Math.max(1,Math.min(30,Number(data.startPoints)||20)),showIndicator:data.showIndicator!==false,turnSeconds:TURN_CHOICES.includes(Number(data.turnSeconds))?Number(data.turnSeconds):30};const room={id:randomUUID().slice(0,8),game:data.game,name:clean(data.name)||'Yeni masa',players:new Set([ws]),host:ws,created:Date.now(),started:false,chat:[],settings,scores:null,finalResult:null,scoreByToken:{},roundResults:[],ticketChoices:new Map(),autoChoices:new Map()};if(room.game==='tombala'){room.settings.drawInterval=[3000,5000,7000].includes(Number(data.drawInterval))?Number(data.drawInterval):5000;setupTombala(room);room.ticketChoices.set(ws,Math.max(1,Math.min(12,Number(data.ticketCount)||1)));room.autoChoices.set(ws,data.auto!==false);}rooms.set(room.id,room);user.room=room.id;send(ws,{type:'joined',room:room.id});notifyRoom(room);broadcast();
+      leave(ws);const settings={lossLimit:Math.max(1,Math.min(30,Number(data.startPoints)||20)),showIndicator:data.showIndicator!==false,turnSeconds:TURN_CHOICES.includes(Number(data.turnSeconds))?Number(data.turnSeconds):30};const room={id:randomUUID().slice(0,8),game:data.game,name:clean(data.name)||'Yeni masa',players:new Set([ws]),host:ws,created:Date.now(),started:false,chat:[],settings,scores:null,finalResult:null,scoreByToken:{},roundResults:[],ticketChoices:new Map(),autoChoices:new Map()};if(room.game==='tombala'){room.settings.drawInterval=30000;setupTombala(room);room.ticketChoices.set(ws,Math.max(1,Math.min(12,Number(data.ticketCount)||1)));room.autoChoices.set(ws,false);}rooms.set(room.id,room);user.room=room.id;send(ws,{type:'joined',room:room.id});notifyRoom(room);broadcast();
     } else if(data.type==='join'){
       const room=rooms.get(clean(data.id,16));if(!room)return send(ws,{type:'error',message:'Masa bulunamadı.'});
       if(user.room===room.id){send(ws,{type:'joined',room:room.id});notifyRoom(room);return;}
       if(room.started)return send(ws,{type:'error',message:'Bu masa başlamış.'});
       if(room.players.size>=maxFor(room.game))return send(ws,{type:'error',message:'Masa dolu.'});
-      leave(ws);room.players.add(ws);if(room.game==='tombala'){room.ticketChoices.set(ws,1);room.autoChoices.set(ws,true);}user.room=room.id;send(ws,{type:'joined',room:room.id});notifyRoom(room);broadcast();
+      leave(ws);room.players.add(ws);if(room.game==='tombala'){room.ticketChoices.set(ws,1);room.autoChoices.set(ws,false);}user.room=room.id;send(ws,{type:'joined',room:room.id});notifyRoom(room);broadcast();
     } else if(data.type==='leave'){
       leave(ws);send(ws,{type:'left'});broadcast();
     } else if(data.type==='chat'){
@@ -86,7 +86,7 @@ wss.on('connection',ws=>{
 
     } else if(data.type==='tombalaSettings'){
       const room=rooms.get(user.room);if(!room||room.game!=='tombala'||room.started)return send(ws,{type:'error',message:'Kart ayarları yalnız oyun başlamadan değişir.'});
-      room.ticketChoices.set(ws,Math.max(1,Math.min(12,Number(data.count)||1)));room.autoChoices.set(ws,data.auto!==false);notifyRoom(room);
+      room.ticketChoices.set(ws,Math.max(1,Math.min(12,Number(data.count)||1)));room.autoChoices.set(ws,false);notifyRoom(room);
     } else if(data.type==='tombalaMark'){
       const room=rooms.get(user.room);if(!room||room.game!=='tombala')return; if(markNumber(room,ws,clean(data.ticketId,24),Number(data.number)))notifyRoom(room);
     } else if(data.type==='showIndicator'){

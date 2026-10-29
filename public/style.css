@@ -16,3 +16,25 @@
 
 /* Tombala v0.7 */
 .tombala-area{padding:16px 8px 22px;color:#f9f1dd}.tombala-stage{display:flex;align-items:center;justify-content:center;gap:24px;padding:20px;border:1px solid #64806a;border-radius:18px;background:linear-gradient(125deg,#14292c,#2a3d30)}.tombala-ball{display:grid;place-items:center;background:radial-gradient(circle at 28% 24%,#fff6ca,#f4bd4f 68%,#bf7926);color:#40220f;font-weight:900;font-size:3.6rem;width:112px;height:112px;border-radius:50%;box-shadow:inset -9px -12px 17px #75400e77,0 9px 18px #0009}.tombala-preferences{display:flex;flex-wrap:wrap;align-items:end;gap:12px;margin:16px 0}.tombala-preferences label{display:flex;gap:8px;align-items:center;font-size:13px}.tombala-preferences select{color:#fff;background:#1b3031;padding:8px;border:1px solid #45635a;border-radius:8px}.tombala-notice{color:#f5d68a;font-weight:700;margin:10px 0}.tombala-history{display:flex;flex-wrap:wrap;gap:5px;margin:14px 0}.drawn-chip{background:#2b4c45;border:1px solid #4f746a;border-radius:50%;width:32px;height:32px;display:grid;place-items:center;font-weight:700;font-size:13px}.tombala-tickets{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr));gap:14px}.tombala-ticket{background:#f4ead2;color:#352a20;padding:12px;border-radius:13px;border:5px solid #76522f;box-shadow:0 8px 20px #0004}.tombala-ticket h3{font-size:13px;margin:0 0 10px;color:#513922}.ticket-grid{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:3px}.ticket-cell{aspect-ratio:1;min-width:0;padding:0;border-radius:4px;border:1px solid #b1a17f;background:#fffaf0;color:#322c25;font-size:clamp(11px,2.2vw,19px);font-weight:800;cursor:pointer}.ticket-blank{background:#aa8b67;opacity:.65}.ticket-called{outline:2px solid #a36b19}.ticket-marked{background:#2c8e65;color:white;border-color:#17633d}.ticket-cell:disabled{cursor:default}@media(max-width:600px){.tombala-stage{gap:12px;padding:10px}.tombala-ball{width:86px;height:86px;font-size:2.5rem}.tombala-area{padding:10px 0}.tombala-tickets{grid-template-columns:1fr}}
+
+/* Tombala v0.8: dedicated mobile-first layout and compact player list */
+.tombala-room .room-layout{display:flex;flex-direction:column;gap:16px}
+.tombala-room .premium-table{display:contents}
+.tombala-room .table-inner{order:4;min-height:0!important;padding:12px!important;border-radius:14px}
+.tombala-room .table-insignia{display:none}
+.tombala-room #seats{display:grid!important;grid-template-columns:repeat(auto-fit,minmax(140px,1fr))!important;gap:8px!important;position:static!important;transform:none!important;margin:0!important;max-height:210px;overflow-y:auto}
+.tombala-room #seats .seat{position:static!important;transform:none!important;max-width:none!important;min-width:0!important}
+.tombala-room .room-message{order:2;margin:0!important;padding:6px!important;font-size:12px}
+.tombala-room .tombala-area{order:1;display:block!important;min-width:0;width:100%;padding:0!important}
+.tombala-room .table-chat{order:3;width:100%;max-width:none}
+.tombala-room .tombala-stage{position:sticky;top:8px;z-index:5;flex-wrap:wrap;justify-content:flex-start;background:#18312d;border:1px solid #9e7d4a;box-shadow:0 12px 26px #0008}
+.draw-heading{width:100%;font-size:12px;letter-spacing:.16em;font-weight:800;color:#e4c185}
+.tombala-room .tombala-ball{flex:none;width:110px;height:110px;font-size:3.7rem}
+.ticket-section-title{margin:14px 0 10px;font-size:13px;letter-spacing:.15em;color:#e5ce9e}
+.tombala-room .tombala-tickets{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr));gap:12px}
+.tombala-room .tombala-ticket{min-width:0;padding:9px;border-width:3px}
+.tombala-room .ticket-grid{gap:2px}
+.tombala-room .ticket-cell{touch-action:manipulation;font-size:clamp(12px,3.3vw,19px);min-height:29px;aspect-ratio:1.1}
+.tombala-room .ticket-cell:disabled:not(.ticket-blank){opacity:1}
+.tombala-room .ticket-marked{background:#217a55!important;color:#fff!important}
+@media(max-width:650px){.tombala-room .room-layout{display:flex!important}.tombala-room .tombala-stage{top:0;border-radius:12px;padding:10px}.tombala-room .tombala-ball{width:86px;height:86px;font-size:2.9rem}.tombala-room .tombala-tickets{grid-template-columns:1fr}.tombala-room #seats{grid-template-columns:repeat(2,minmax(0,1fr))!important}.tombala-room .ticket-cell{min-height:30px;font-size:15px}.tombala-room .table-chat{min-width:0}}
