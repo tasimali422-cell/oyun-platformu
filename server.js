@@ -89,4 +89,4 @@ wss.on('connection',ws=>{
   });
   ws.on('close',()=>{leave(ws);clients.delete(ws);broadcast();});ws.on('error',()=>{});
 });
-server.listen(port,'0.0.0.0',()=>console.log(`Game room demo v0.2 listening on ${port}`));
+server.listen(port,'0.0.0.0',()=>console.log(`Game room demo v0.3.1 listening on ${port}`));
