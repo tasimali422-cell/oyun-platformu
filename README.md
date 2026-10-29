@@ -1,12 +1,7 @@
-# Oyun Platformu v0.9 — Tombala oda ayarları (test sürümü)
+# Oyun Platformu v0.9.1 — Tombala düzeltmesi
 
-Mevcut v0.8 kodunun üstüne kurulmuştur; Okey kurallarına dokunulmadı.
+Bu güncelleme v0.9 üzerine kuruludur. İlk tamamlanan çinko aşaması sunucuda bir kere kazandırılır; aynı çekiliş sayısını 30 saniyelik pencerede tamamlayan oyuncular eşit kazanır. 30 saniyede işaretlenmeyen rakamlar kazanma şartına dahil edilmez. Kart sayısı 1/2/4/8/12 olarak oyun öncesinde seçilir. Sohbet masaüstünde sabit yan panel, mobilde açılır düğmedir.
 
-- Masa sahibi 5–120 saniye sayı çekme aralığı seçer. Sayı işaretleme süresi **30 saniye** olarak kalır. 5 saniyelik aralıkta birden fazla sayı için açık işaretleme penceresi bulunabilir.
-- Masa sahibi 2–24 oyuncu sınırı belirler.
-- Kart başı test puanı, birinci/ikinci çinko ve Tombala için **gösterim amaçlı** puan değerleri belirler. Bunlar lobi listesinde ve oyun odasında gösterilir.
-- **Bu sürüm gerçek kredi bakiyesi, üyelik, ödeme, admin, hediye ya da ödül transferi yapmaz.** Hesap cüzdanı ve admin yetkileri için PostgreSQL, güvenli oturum ve işlem defteri gerekir.
-- Manuel işaretleme süresi v0.8'deki gibi 30 saniyedir. Önceki sürümde kazanma denetimi çekilen sayılara göre yapılmaktadır; kullanıcı işaretlerine göre sonuç doğrulaması ayrıca geliştirilecektir.
-- Uygulama yeniden başlatılırsa aktif masalar silinir.
+**Bilerek etkinleştirilmedi:** Üyelik, yönetici ve moderatör yetkileri, VIP/Elit, gerçek puan cüzdanı, puanla kart satın alma ve ücretli hediyeler. Bu servisler kimlik doğrulama, PostgreSQL bağlantısı ve denetlenebilir para benzeri puan defteri olmadan güvenli değildir. Oda puanları görsel bilgilendirmedir.
 
-Test: `npm install && npm test`. Coolify için mevcut Dockerfile ile deploy edin.
+Test: `npm test`. Sunucu: `npm start`; Coolify mevcut Dockerfile kaynağını redeploy edin. Sunucu belleğindeki açık masalar yeniden başlatmada kaybolur.

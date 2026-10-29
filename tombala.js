@@ -27,23 +27,51 @@ export function makeTicket(){
  return {id:randomUUID().slice(0,12),grid:matrix};
 }
 export function analyzeTicket(ticket,drawn){let completed=0;for(const row of ticket.grid){const values=row.filter(Number.isInteger);if(values.length===5&&values.every(n=>drawn.has(n)))completed++;}return completed;}
-export function setupTombala(room){room.tombala={phase:'waiting',drawn:[],latest:null,tickets:new Map(),manualMarks:new Map(),auto:new Map(),claims:{c1:[],c2:[],tombala:[]},intervalMs:Math.max(5000,Math.min(120000,Number(room.settings?.drawInterval)||30000)),nextAt:null,deck:shuffle(Array.from({length:90},(_,i)=>i+1)),winnerKeys:new Set(),announcements:[],drawTimes:new Map(),markWindowMs:30000};}
+export function setupTombala(room){room.tombala={phase:'waiting',drawn:[],latest:null,tickets:new Map(),manualMarks:new Map(),auto:new Map(),claims:{c1:[],c2:[],tombala:[]},intervalMs:Math.max(5000,Math.min(120000,Number(room.settings?.drawInterval)||30000)),nextAt:null,deck:shuffle(Array.from({length:90},(_,i)=>i+1)),winnerKeys:new Set(),stageWinners:{c1:null,c2:null,tombala:null},announcements:[],drawTimes:new Map(),pending:{},markWindowMs:30000};}
 export function distribute(room){const g=room.tombala;if(!g)return;g.tickets.clear();g.manualMarks.clear();g.auto.clear();for(const ws of room.players){const count=Math.max(1,Math.min(12,room.ticketChoices?.get(ws)||1));g.tickets.set(ws,Array.from({length:count},makeTicket));g.manualMarks.set(ws,new Set());g.auto.set(ws,false);}}
-export function userView(room,ws){const g=room.tombala;if(!g)return null;return {phase:g.phase,latest:g.latest,drawn:g.drawn,remaining:g.deck.length,nextAt:g.nextAt,intervalMs:g.intervalMs,claims:g.claims,announcements:g.announcements.slice(-12),tickets:g.tickets.get(ws)||[],manualMarks:[...(g.manualMarks.get(ws)||new Set())],auto:false,markWindowMs:g.markWindowMs,drawTimes:Object.fromEntries(g.drawTimes),serverNow:Date.now(),ticketCount:room.ticketChoices?.get(ws)||1};}
+export function userView(room,ws){const g=room.tombala;if(!g)return null;return {phase:g.phase,latest:g.latest,drawn:g.drawn,remaining:g.deck.length,nextAt:g.nextAt,intervalMs:g.intervalMs,claims:g.claims,stageWinners:g.stageWinners,announcements:g.announcements.slice(-12),tickets:g.tickets.get(ws)||[],manualMarks:[...(g.manualMarks.get(ws)||new Set())],auto:false,markWindowMs:g.markWindowMs,drawTimes:Object.fromEntries(g.drawTimes),serverNow:Date.now(),ticketCount:room.ticketChoices?.get(ws)||1};}
+// Marks are authoritative; each number can only be marked in its 30-second window.
 export function markNumber(room,ws,ticketId,n,now=Date.now()){
  const g=room.tombala;if(!g||g.phase!=='running'||!Number.isInteger(n))return false;
  const ticket=(g.tickets.get(ws)||[]).find(t=>t.id===ticketId);
  const calledAt=g.drawTimes.get(n);
- if(!ticket||!ticket.grid.some(row=>row.includes(n))||!calledAt||now-calledAt>g.markWindowMs)return false;
+ if(!ticket||!ticket.grid.some(row=>row.includes(n))||!calledAt||now<calledAt||now-calledAt>=g.markWindowMs)return false;
  const key=ticketId+':'+n;const marks=g.manualMarks.get(ws)||new Set();
- if(marks.has(key))return false; // once marked, remains marked
- marks.add(key);g.manualMarks.set(ws,marks);return true;
+ if(marks.has(key))return false;
+ marks.add(key);g.manualMarks.set(ws,marks);
+ // The player must physically mark every number; unmarked draws do not count.
+ for(const [threshold,stage] of [[1,'c1'],[2,'c2'],[3,'tombala']]){
+  if((g.stageWinners??={c1:null,c2:null,tombala:null})[stage])continue;
+  const rows=ticket.grid.filter(row=>row.filter(Number.isInteger).every(x=>marks.has(ticketId+':'+x))).length;
+  if(rows<threshold)continue;
+  // First completing draw wins. Others completing on the same drawn number
+  // share the stage; candidates are resolved when that number's window closes.
+  const current=g.pending?.[stage];
+  const drawIndex=(g.drawn||[]).indexOf(n);
+  if(!current||drawIndex<current.drawIndex){
+   (g.pending??={})[stage]={drawIndex,number:n,deadline:calledAt+g.markWindowMs,winners:new Map()};
+  }
+  const pending=g.pending[stage];if(pending.drawIndex===drawIndex)pending.winners.set(ws.__seatId||ws,{ws,ticketId});
+ }
+ return true;
 }
-export function drawNumber(room,username){const g=room.tombala;if(!g||g.phase!=='running')return false;if(!g.deck.length){g.phase='ended';g.nextAt=null;return true;}
- const n=g.deck.pop();g.drawn.push(n);g.latest=n;g.drawTimes.set(n,Date.now());const drawn=new Set(g.drawn);const hit={c1:[],c2:[],tombala:[]};
- for(const [ws,tickets] of g.tickets){for(const ticket of tickets){const rows=analyzeTicket(ticket,drawn);for(const [threshold,stage] of [[1,'c1'],[2,'c2'],[3,'tombala']]){const key=ws.__seatId+':'+ticket.id+':'+stage;if(rows>=threshold&&!g.winnerKeys.has(key)){g.winnerKeys.add(key);hit[stage].push({name:username(ws),ticketId:ticket.id});}}}}
- for(const stage of ['c1','c2','tombala'])if(hit[stage].length){g.claims[stage].push({number:n,winners:hit[stage]});g.announcements.push(`${stage==='c1'?'1. Çinko':stage==='c2'?'2. Çinko':'TOMBALA'}! ${hit[stage].map(x=>x.name).join(', ')}`);}
- // All tickets completing with the same number share victory.
- if(hit.tombala.length){g.phase='ended';g.nextAt=null;}else{g.nextAt=Date.now()+g.intervalMs;}
+export function finalizeClaims(room,username,now=Date.now()){
+ const g=room.tombala;if(!g)return false;let updated=false;
+ for(const stage of ['c1','c2','tombala']){
+  const p=g.pending?.[stage];if(!p||g.stageWinners[stage]||now<p.deadline)continue;
+  const winners=[...p.winners.values()].map(({ws,ticketId})=>({name:username(ws),ticketId,seatId:ws.__seatId||null}));
+  if(!winners.length)continue;
+  g.claims[stage].push({number:p.number,winners});g.stageWinners[stage]={number:p.number,winners};
+  g.announcements.push(`${stage==='c1'?'1. Çinko':stage==='c2'?'2. Çinko':'TOMBALA'} kazananları: ${winners.map(x=>x.name).join(', ')}`);
+  updated=true;
+  if(stage==='tombala'){g.phase='ended';g.nextAt=null;}
+ }
+ return updated;
+}
+export function drawNumber(room,username){
+ const g=room.tombala;if(!g||g.phase!=='running')return false;
+ if(!g.deck.length){g.nextAt=null;return false;}
+ const n=g.deck.pop();g.drawn.push(n);g.latest=n;g.drawTimes.set(n,Date.now());
+ g.nextAt=Date.now()+g.intervalMs;
  return true;
 }

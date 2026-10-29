@@ -1,4 +1,4 @@
-import { TOMBALA_MAX_PLAYERS, setupTombala, distribute, userView, markNumber, drawNumber } from './tombala.js';
+import { TOMBALA_MAX_PLAYERS, setupTombala, distribute, userView, markNumber, drawNumber, finalizeClaims } from './tombala.js';
 import { settleMatch, applyHandScore, validWinningHand, isRealJoker } from './scoring.js';
 import http from 'node:http';
 import fs from 'node:fs';
@@ -54,8 +54,8 @@ wss.on('connection',ws=>{
     if(data.type==='resume'){
       const token=clean(data.token,100);const old=reconnectTokens.get(token);const prior=old&&clients.get(old);
       if(prior&&!prior.active){const room=rooms.get(prior.room);if(room){room.players=new Set([...room.players].map(p=>p===old?ws:p));if(room.host===old)room.host=ws;if(room.round)room.round.order=room.round.order.map(p=>p===old?ws:p);if(room.tombala){for(const field of ['tickets','auto','manualMarks']){const map=room.tombala[field];if(map?.has(old)){map.set(ws,map.get(old));map.delete(old);}}}for(const field of ['ticketChoices','autoChoices']){const map=room[field];if(map?.has(old)){map.set(ws,map.get(old));map.delete(old);}}}
-        clients.set(ws,{...prior,active:true,lastAction:0});clients.delete(old);reconnectTokens.delete(token);send(ws,{type:'resumed',room:room?.id||null});if(room)notifyRoom(room);broadcast();return;}
-      user.token=token||randomUUID();send(ws,{type:'session',token:user.token});return;
+        ws.__seatId=prior.token;clients.set(ws,{...prior,active:true,lastAction:0});clients.delete(old);reconnectTokens.delete(token);send(ws,{type:'resumed',room:room?.id||null});if(room)notifyRoom(room);broadcast();return;}
+      user.token=token||randomUUID();ws.__seatId=user.token;send(ws,{type:'session',token:user.token});return;
     } else if(data.type==='profile'){
       const current=clients.get(ws);current.name=clean(data.name,20)||'Misafir';const room=rooms.get(current.room);if(room)notifyRoom(room);
     } else if(data.type==='create'){
@@ -137,6 +137,7 @@ wss.on('connection',ws=>{
 setInterval(()=>{
   for(const room of rooms.values()){
     if(room.game==='tombala'&&room.tombala?.phase==='running'&&Date.now()>=room.tombala.nextAt){drawNumber(room,ws=>clients.get(ws)?.name||'Oyuncu');if(room.tombala.phase==='ended')room.started=false;notifyRoom(room);broadcast();}
+    if(room.game==='tombala'&&room.tombala&&finalizeClaims(room,ws=>clients.get(ws)?.name||'Oyuncu')){if(room.tombala.phase==='ended')room.started=false;notifyRoom(room);broadcast();}
     const g=room.round;if(!g||g.status!=='playing'||!g.deadline||Date.now()<g.deadline)continue;
     const seat=g.turn;
     if(g.phase==='draw'){
