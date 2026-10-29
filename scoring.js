@@ -15,52 +15,74 @@ export function applyHandScore(scores,winner,penalty=2){
   if(!Array.isArray(scores)||scores.length!==4||winner<0||winner>3||![2,4].includes(penalty))throw new Error('Invalid hand');
   return scores.map((v,i)=>i===winner?v+3*penalty:v-penalty);
 }
-export function isRealJoker(tile,indicator){
-  return Boolean(tile && indicator && indicator.color<4 && tile.color===indicator.color && tile.n===(indicator.n%13+1));
+export function isRealJoker(tile, indicator) {
+  return Boolean(tile && indicator && tile.color !== 4 &&
+    tile.color === indicator.color && tile.n === indicator.n % 13 + 1);
 }
-// Partition of 14 tiles into valid 3+ sets of colors/runs or 7 pairs.
-// Fake okey is treated as the displayed indicator successor; true okey wildcard.
-export function validWinningHand(hand,indicator){
-  if(!Array.isArray(hand)||hand.length!==14||!indicator||indicator.color===4)return false;
-  const jokerNumber=indicator.n%13+1;
-  const normalized=hand.map(t=>t.color===4?{color:indicator.color,n:jokerNumber}:t);
-  const wild=normalized.filter(t=>isRealJoker(t,indicator)).length;
-  const plain=normalized.filter(t=>!isRealJoker(t,indicator));
-  const pairCounts=new Map();plain.forEach(t=>{const k=`${t.color}:${t.n}`;pairCounts.set(k,(pairCounts.get(k)||0)+1);});
-  const pairs=[...pairCounts.values()].reduce((sum,n)=>sum+Math.floor(n/2),0);
-  const singles=[...pairCounts.values()].reduce((sum,n)=>sum+n%2,0);
-  if(pairs+Math.floor(wild/2)+Math.min(wild%2,singles)>=7)return true;
-  const encode=arr=>arr.map(t=>`${t.color}-${t.n}`).sort().join(',');
-  const visited=new Set();
-  function solve(arr,w){
-    if(!arr.length)return w===0||w>=3; // remaining wildcards form a valid group
-    const key=encode(arr)+'|'+w;if(visited.has(key))return false;visited.add(key);
-    const first=arr[0];
-    // Same number, different colors; includes first, 3 or 4 total.
+
+// True joker: any needed tile. Fake joker: exactly the physical okey's color and number.
+// Indicator is never represented by a fake joker.
+export function validWinningHand(hand, indicator) {
+  if (!Array.isArray(hand) || hand.length !== 14 || !indicator ||
+      !Number.isInteger(indicator.n) || indicator.n < 1 || indicator.n > 13 ||
+      !Number.isInteger(indicator.color) || indicator.color < 0 || indicator.color > 3) return false;
+
+  const jokerNo = indicator.n % 13 + 1;
+  let wild = 0;
+  const tiles = [];
+  for (const tile of hand) {
+    if (!tile || !Number.isInteger(tile.color) || !Number.isInteger(tile.n)) return false;
+    if (tile.color === 4) { tiles.push({ color: indicator.color, n: jokerNo }); continue; }
+    if (tile.color < 0 || tile.color > 3 || tile.n < 1 || tile.n > 13) return false;
+    if (isRealJoker(tile, indicator)) wild++;
+    else tiles.push({color:tile.color,n:tile.n});
+  }
+  if (wild > 2) return false;
+
+  // Seven pairs, including pairs completed by a real joker.
+  const counts = new Map();
+  for (const t of tiles) { const k = `${t.color}:${t.n}`; counts.set(k, (counts.get(k) || 0) + 1); }
+  if ([...counts.values()].reduce((n, v) => n + (v % 2), 0) <= wild) return true;
+
+  // Standard runs never continue 13-1-2; only the final 1 after 13 is allowed.
+  const runs = [];
+  for (let start=1;start<=13;start++) {
+    for (let size=3;size<=13;size++) {
+      const seq = Array.from({length:size},(_,i)=>start+i);
+      if (seq.at(-1)<=13) runs.push(seq);
+      else if (seq.at(-1)===14) runs.push(seq.map(n=>n===14?1:n));
+    }
+  }
+  const seen=new Set();
+  function solve(remaining, jokers) {
+    if (!remaining.length) return jokers===0; // at most two real jokers in a set
+    const key=remaining.map(t=>`${t.color}:${t.n}`).sort().join(',')+'|'+jokers;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    const anchor=remaining[0];
+    const candidates=[];
+    // A group uses 3-4 different colors with the same number.
     for(let size=3;size<=4;size++){
-      const options=arr.map((t,i)=>({t,i})).filter(x=>x.t.n===first.n&&x.t.color!==first.color);
-      for(const picks of subsets(options,size-1)){
-        if(new Set(picks.map(x=>x.t.color)).size!==picks.length)continue;
-        const need=size-1-picks.length;if(need>w)continue;
-        const banned=new Set([0,...picks.map(x=>x.i)]);
-        if(solve(arr.filter((_,i)=>!banned.has(i)),w-need))return true;
-      }
-      // fill wildcard missing colors; choose 0..size-1 real tiles
-      for(let k=0;k<Math.min(size-1,options.length);k++)for(const picks of subsets(options,k)){
-        if(new Set(picks.map(x=>x.t.color)).size!==picks.length)continue;
-        const need=size-1-picks.length;if(need>w)continue;
-        const banned=new Set([0,...picks.map(x=>x.i)]);
-        if(solve(arr.filter((_,i)=>!banned.has(i)),w-need))return true;
+      for(let mask=1;mask<16;mask++){
+        if(!(mask & (1<<anchor.color)))continue;
+        const colors=[0,1,2,3].filter(c=>mask&(1<<c));
+        if(colors.length!==size)continue;
+        candidates.push(colors.map(color=>({color,n:anchor.n})));
       }
     }
-    // Runs 3..13, same color, consecutive, include first; no wraparound.
-    for(let size=3;size<=13;size++)for(let start=Math.max(1,first.n-size+1);start<=Math.min(first.n,14-size);start++){
-      const used=new Set([0]);let need=0;
-      for(let n=start;n<start+size;n++){if(n===first.n)continue;const i=arr.findIndex((t,i)=>!used.has(i)&&t.color===first.color&&t.n===n);if(i>=0)used.add(i);else need++;}
-      if(need<=w&&solve(arr.filter((_,i)=>!used.has(i)),w-need))return true;
+    for(const run of runs)if(run.includes(anchor.n))candidates.push(run.map(n=>({color:anchor.color,n})));
+    for(const candidate of candidates){
+      const rest=[...remaining],anchorIndex=rest.findIndex(t=>t.color===anchor.color&&t.n===anchor.n);
+      rest.splice(anchorIndex,1);
+      let missing=0;
+      for(const target of candidate){
+        if(target.color===anchor.color&&target.n===anchor.n)continue;
+        const ix=rest.findIndex(t=>t.color===target.color&&t.n===target.n);
+        if(ix>=0)rest.splice(ix,1);else missing++;
+      }
+      if(missing<=jokers&&solve(rest,jokers-missing))return true;
     }
     return false;
   }
-  return solve(plain,wild);
+  return solve(tiles,wild);
 }
-function subsets(arr,k){if(k===0)return [[]];if(k>arr.length)return [];const out=[];function visit(start,t){if(t.length===k){out.push(t);return;}for(let i=start;i<arr.length;i++)visit(i+1,[...t,arr[i]]);}visit(0,[]);return out;}
