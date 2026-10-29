@@ -7,3 +7,5 @@
 
 /* v0.3.1 independent rack sorting */
 .okey-tile{touch-action:manipulation;user-select:none;transition:transform .12s,border-color .12s;flex-shrink:0}.okey-tile.selected{transform:translateY(-9px);outline:3px solid #99f6ad;outline-offset:2px}.my-tiles{align-content:start;min-height:55px}.okey-actions .primary:disabled{opacity:.4;cursor:not-allowed}#startGame:disabled{opacity:.45;cursor:not-allowed}.okey-area .tile-help{margin-top:8px}
+
+.indicator-choice{display:flex!important;flex-direction:row!important;align-items:center;gap:12px}.indicator-choice input{width:auto!important;flex:0 0 auto}#tableSettings{margin-top:9px}
