@@ -2,7 +2,7 @@ FROM node:22-alpine
 WORKDIR /app
 COPY package*.json ./
 RUN npm install --omit=dev --no-audit --no-fund
-COPY server.js scoring.js ./
+COPY server.js scoring.js tombala.js ./
 COPY public ./public
 ENV NODE_ENV=production PORT=3000
 EXPOSE 3000
