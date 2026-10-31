@@ -1,36 +1,100 @@
-/* Arena Club v2.2 — self-contained, responsive Ludo table. */
-.ludo-stage{padding:12px!important;display:block!important;min-height:0!important;background:linear-gradient(150deg,#152035,#0c162b)!important}
-.ludo-wrap{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(220px,.85fr);gap:15px;align-items:start;width:100%}
-.ludo-board-side{min-width:0}
-.ludo-board{width:100%;max-width:625px;aspect-ratio:1;margin-inline:auto;display:grid;grid-template-columns:repeat(15,minmax(0,1fr));grid-template-rows:repeat(15,minmax(0,1fr));background:#f2eee3;border:5px solid #bc9255;outline:2px solid #6b5334;box-shadow:0 16px 37px #0009, inset 0 0 0 2px #ffdfa3;border-radius:6px;overflow:hidden}
-.ludo-cell{position:relative;min-width:0;min-height:0;border:1px solid #0002;background:#fffef5;display:grid;place-items:center}
-.ludo-cell.base-red{background:#bb253f}.ludo-cell.base-blue{background:#3476df}.ludo-cell.base-yellow{background:#e2b33d}.ludo-cell.base-green{background:#218e6e}
-.ludo-cell.home-red,.ludo-cell.entry-red{background:#e77988}.ludo-cell.home-blue,.ludo-cell.entry-blue{background:#7aa6e8}.ludo-cell.home-yellow,.ludo-cell.entry-yellow{background:#f4d077}.ludo-cell.home-green,.ludo-cell.entry-green{background:#75c8a9}
-.ludo-cell.finish{background:conic-gradient(#4384e7 0deg 90deg,#dfb537 90deg 180deg,#37a886 180deg 270deg,#d74561 270deg 360deg)}
-.ludo-star{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:clamp(8px,1vw,16px);line-height:1;color:#92612b;opacity:.9}
-.ludo-pieces{z-index:2;position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:0;pointer-events:none}
-.ludo-piece{pointer-events:auto;min-width:0;min-height:0;padding:0;width:67%;height:67%;font-size:clamp(8px,.9vw,12px);font-weight:900;line-height:1;border-radius:50%;border:2px solid #fff9;color:white;box-shadow:inset 0 -3px 1px #0004,0 2px 6px #0008;text-shadow:0 1px 2px #0008;display:grid;place-items:center;cursor:default}
-.ludo-piece.red,.ludo-dot.red{background:#cb2446}.ludo-piece.blue,.ludo-dot.blue{background:#357ae2}.ludo-piece.yellow,.ludo-dot.yellow{background:#d7a332;color:#29211b;text-shadow:none}.ludo-piece.green,.ludo-dot.green{background:#1c9b73}
-.ludo-pieces:has(.ludo-piece:nth-child(2)) .ludo-piece{width:47%;height:47%;font-size:9px}
-.ludo-pieces:has(.ludo-piece:nth-child(4)) .ludo-piece{width:42%;height:42%}
-.ludo-piece.can-move{cursor:pointer;outline:3px solid #fff;outline-offset:1px;animation:ludo-glow 1.25s ease-in-out infinite alternate;z-index:3}
+/* Arena Club 2.3: custom outer-ring Ludo board. The server remains authoritative. */
+:root{--arena-wood:#b17b46;--arena-cream:#fff7dc;--arena-red:#cb344c;--arena-blue:#347bcb;--arena-yellow:#e3b439;--arena-green:#239775}
+#overlayRoot:has(.ludo-table-modal) .overlay{padding:9px;overflow:hidden;place-items:center}
+.ludo-table-modal{width:min(1340px,100%)!important;height:min(875px,calc(100dvh - 18px));max-height:calc(100dvh - 18px)!important;display:flex;flex-direction:column;overflow:hidden!important;padding:15px 17px!important;border-radius:20px}
+.ludo-table-modal>.modal-title{flex:0 0 auto;margin-bottom:8px;align-items:center}
+.ludo-table-modal>.modal-title h2{font-size:23px}
+.ludo-table-modal>.table-stage{min-height:0;flex:1 1 auto;display:grid;grid-template-columns:minmax(0,1fr) minmax(155px,185px);align-items:stretch;gap:12px;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+.ludo-table-modal .stage-aside{padding:12px;min-width:0;min-height:0;font-size:12px;overflow-y:auto}
+.ludo-table-modal .stage-aside h3{font-size:14px;margin-top:0}.ludo-table-modal .stage-aside .info-list{font-size:11px;gap:8px}
+.ludo-table-modal .stage-aside .help{font-size:10px}
+.ludo-table-modal .table-bottom-chat{flex:0 0 auto;margin-top:9px;min-height:116px}
+.ludo-table-modal .chat-caption{padding:6px 12px}
+.ludo-table-modal .two-line-log{height:44px;line-height:20px;padding:4px 12px;overflow-y:auto;scroll-behavior:smooth}
+.ludo-table-modal .inline-compose{padding:6px}
+.ludo-table-modal .inline-compose input,.ludo-table-modal .inline-compose .btn{min-height:32px;height:34px}
+.ludo-stage{min-width:0;min-height:0!important;padding:9px!important;display:flex!important;align-items:center;justify-content:center!important;gap:0!important;background:radial-gradient(circle at 50% 35%,#2c3244 0%,#131c30 75%)!important;overflow:hidden}
+.ludo-wrap{width:100%;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(170px,210px);align-items:center;gap:12px}
+.ludo-board-side{min-width:0;display:grid;place-items:center;align-content:center}
+.ludo-wood-frame{width:min(53dvh,100%,550px);aspect-ratio:1;padding:8px;background:linear-gradient(135deg,#c89e67,#77502e 14%,#d0a56a 35%,#6f4727 55%,#c79556 76%,#6e4425);border:2px solid #e4bd7d;border-radius:14px;box-shadow:0 14px 32px #0008,inset 0 0 0 2px #573f29,inset 0 0 0 5px #f2cc91;flex:none}
+.ludo-board{position:relative;width:100%;height:100%;display:grid;grid-template-columns:repeat(14,minmax(0,1fr));grid-template-rows:repeat(14,minmax(0,1fr));overflow:hidden;border-radius:7px;background:#fff5d8;box-shadow:inset 0 0 10px #3f291d55}
+.ludo-cell{position:relative;min-width:0;min-height:0;display:grid;place-items:center;background:#f4ede2;border:1px solid #ffffff16;isolation:isolate}
+.ludo-cell.track,.ludo-cell[class*="entry-"]{background:linear-gradient(140deg,#434653,#202431);border:1px solid #5e4b41}
+.ludo-cell.track::before,.ludo-cell[class*="entry-"]::before{content:"";position:absolute;inset:7%;border-radius:50%;background:radial-gradient(circle at 35% 27%,#fffcf0,#ebddbb 64%,#c3ae81 100%);border:1px solid #fff4d9;box-shadow:0 1px 2px #0006,0 0 0 1px #8c704b}
+.ludo-cell.entry-red::before{background:radial-gradient(circle at 30% 25%,#fa8b8d,#ce3649 75%)}
+.ludo-cell.entry-blue::before{background:radial-gradient(circle at 30% 25%,#88cbff,#3878c8 75%)}
+.ludo-cell.entry-yellow::before{background:radial-gradient(circle at 30% 25%,#ffe59a,#dbad30 75%)}
+.ludo-cell.entry-green::before{background:radial-gradient(circle at 30% 25%,#99e6cb,#229675 75%)}
+.ludo-cell.base-red{background:linear-gradient(145deg,#d95059,#b32943);border-color:#f3adab13}
+.ludo-cell.base-blue{background:linear-gradient(145deg,#4d9bdd,#256cb6);border-color:#8aceff20}
+.ludo-cell.base-yellow{background:linear-gradient(145deg,#f3c84e,#c89b2a);border-color:#fff0a91d}
+.ludo-cell.base-green{background:linear-gradient(145deg,#39b28a,#1d806a);border-color:#b9ffe51d}
+.ludo-cell[class*="home-"]{z-index:1;box-shadow:inset 0 0 0 1px #ffffff80,inset 0 -3px 0 #0002}
+.ludo-cell.home-red{background:#f8a3a1}.ludo-cell.home-blue{background:#9ac8fa}.ludo-cell.home-yellow{background:#ffe597}.ludo-cell.home-green{background:#93dec1}
+.ludo-cell.finish{background:conic-gradient(from -45deg at 50% 50%,#6baaf0,#ffe3a0,#73cda9,#ed8090,#6baaf0);border:1px solid #fff3c2a5}
+.ludo-star{position:relative;z-index:2;color:#ad7629;font-size:clamp(9px,1.3vw,17px);line-height:1;text-shadow:0 1px 1px white;pointer-events:none}
+.ludo-center-brand{position:absolute;z-index:3;pointer-events:none;inset:42.85% 42.85%;border-radius:50%;background:radial-gradient(circle,#303c57,#161a33);border:2px solid #ffd682;display:grid;place-items:center;text-align:center;font-size:clamp(4px,.48vw,7px);line-height:1.1;letter-spacing:.04em;font-weight:950;color:#ffe6a4;box-shadow:0 1px 9px #0006}
+.ludo-cell.ludo-drop-zone:not(.finish)::after{content:"";position:absolute;inset:3%;z-index:1;border-radius:40%;border:2px dashed #ffffffa0;box-shadow:0 0 9px 1px #fff5;pointer-events:none;animation:ludo-target 1.2s ease-in-out infinite alternate}
+@keyframes ludo-target{from{opacity:.35}to{opacity:.95}}
+.ludo-pieces{position:absolute;inset:0;z-index:5;display:flex;justify-content:center;align-items:center;flex-wrap:wrap;pointer-events:none}
+.ludo-piece{--pawn-dark:#8a1930;--pawn-light:#ff8b94;position:relative;pointer-events:auto;display:grid;place-items:center;width:82%;height:85%;padding:0;min-width:0;min-height:0;border:none;border-radius:50%;background:none;filter:drop-shadow(0 2px 1px #0008);cursor:default;touch-action:manipulation;transition:filter .16s,transform .16s}
+.ludo-piece::before{content:"";position:absolute;z-index:2;left:27%;top:4%;width:46%;height:43%;border-radius:50%;background:radial-gradient(circle at 30% 23%,#fff9,var(--pawn-light) 34%,var(--pawn-dark) 95%);border:1px solid #fff8;box-shadow:0 1px 2px #0005}
+.ludo-piece::after{content:"";position:absolute;z-index:1;left:10%;bottom:6%;width:80%;height:57%;border-radius:45% 45% 35% 35%;background:linear-gradient(105deg,var(--pawn-dark),var(--pawn-light) 47%,var(--pawn-dark) 90%);clip-path:polygon(37% 0%,63% 0%,73% 45%,95% 75%,100% 98%,0 98%,5% 75%,27% 45%);border-bottom:3px solid #fff7}
+.ludo-piece.red,.ludo-dot.red{--pawn-dark:#9f193a;--pawn-light:#ff6577;background-color:transparent}
+.ludo-piece.blue,.ludo-dot.blue{--pawn-dark:#164894;--pawn-light:#72bdff;background-color:transparent}
+.ludo-piece.yellow,.ludo-dot.yellow{--pawn-dark:#997018;--pawn-light:#ffe47b;background-color:transparent}
+.ludo-piece.green,.ludo-dot.green{--pawn-dark:#126f56;--pawn-light:#7fe5b8;background-color:transparent}
+.ludo-dot.red{background:#d63553}.ludo-dot.blue{background:#4089e9}.ludo-dot.yellow{background:#ecc451}.ludo-dot.green{background:#27a27b}
+.ludo-piece .pawn-no{position:absolute;z-index:4;bottom:7%;font-size:clamp(6px,.65vw,10px);font-weight:950;line-height:1;color:white;text-shadow:0 1px 2px #000c}
+.ludo-piece.yellow .pawn-no{color:#412e0c;text-shadow:0 1px #fff4}
+.ludo-pieces:has(.ludo-piece:nth-child(2)) .ludo-piece{width:47%;height:55%}
+.ludo-pieces:has(.ludo-piece:nth-child(4)) .ludo-piece{width:42%;height:49%}
 .ludo-piece:disabled{opacity:1}
-@keyframes ludo-glow{from{box-shadow:0 0 5px #fff8,0 1px 7px #000b}to{box-shadow:0 0 15px 5px #fff9,0 1px 7px #000b}}
-.ludo-help{text-align:center;font-size:11px;color:#b7c6dc;margin:10px 0 0}
-.ludo-control{display:flex;flex-direction:column;gap:12px;padding:12px;background:linear-gradient(145deg,#202b47,#111a30);border-radius:16px;border:1px solid #414e6b;min-width:0}
-.ludo-control h3{margin:0;font-size:18px}
-.ludo-player-list{display:grid;gap:5px}
-.ludo-player{display:flex;gap:10px;align-items:center;border:1px solid #354461;border-radius:10px;padding:7px 10px;background:#141e35}
-.ludo-player.active{border-color:#eac379;background:#29304a}
-.ludo-player b,.ludo-player small{display:block;line-height:1.4}.ludo-player b{font-size:12px}.ludo-player small{font-size:10px;color:#aabbda}
-.ludo-dot{width:17px;height:17px;border-radius:50%;border:2px solid #fff5;flex:none}
-.ludo-dice{display:grid;justify-items:center;gap:2px;padding:10px;border:1px solid #5b5672;background:#141c32;border-radius:14px}
-.ludo-dice span{letter-spacing:.15em;color:#d9bb83;font-size:9px;font-weight:900}.ludo-dice strong{font-size:38px;color:#fff;line-height:1.2}.ludo-dice small{color:#b5c8e4}
-.ludo-clock{font-size:12px;color:#aabbda}.ludo-clock strong{color:#eac379}
-.ludo-action{width:100%;font-size:14px}.ludo-prompt{font-size:12px;color:#e3c690;margin:0}.ludo-notice{font-size:12px;color:#d3b67b;margin:0!important;text-align:left!important}.ludo-eventlog{max-height:80px;overflow:auto;font-size:11px;color:#9eabc6}.ludo-eventlog p{margin:0 0 5px!important;text-align:left!important;font-size:11px!important}
-.ludo-result{border:1px solid #9b7642;background:#362d2a;border-radius:12px;padding:12px;display:grid;gap:7px}.ludo-result h3{font-size:15px}.ludo-result div{display:flex;justify-content:space-between;gap:8px;font-size:12px}.ludo-result .gain{color:#7be5a5}.ludo-result .loss{color:#ff9da4}.ludo-result small{color:#bbacc1;font-size:10px}
-.ludo-intro{text-align:center;min-height:280px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:18px}.ludo-intro p{max-width:440px!important}.ludo-intro h3{font-size:21px}.ludo-intro .alert{max-width:450px}.ludo-dice-icon{font-size:62px}
-.table-tile .playing-tag{color:#d5ba81}
-@media(max-width:1100px){.ludo-wrap{grid-template-columns:minmax(0,1fr)}.ludo-control{display:grid;grid-template-columns:1fr 1fr}.ludo-player-list{grid-column:span 2}.ludo-notice,.ludo-eventlog,.ludo-result{grid-column:span 2}.ludo-board{max-width:530px}}
-@media(max-width:760px){.ludo-stage{padding:4px!important}.ludo-board{max-width:520px;border-width:3px}.ludo-control{padding:10px;gap:9px}.ludo-piece{border-width:1px}.ludo-piece.can-move{outline-width:1px}.stage-aside{font-size:12px}.ludo-control h3{font-size:15px}.ludo-wrap{gap:10px}}
-@media(max-width:400px){.ludo-board{border-width:2px}.ludo-player b{font-size:11px}.ludo-control{grid-template-columns:1fr}.ludo-player-list,.ludo-notice,.ludo-eventlog,.ludo-result{grid-column:1}.ludo-piece{font-size:7px}}
+.ludo-piece.can-move{cursor:grab;touch-action:none;filter:drop-shadow(0 0 5px #fff) drop-shadow(0 0 5px #fff);animation:ludo-pawn-pulse 1s ease-in-out infinite alternate}
+.ludo-piece.can-move:active{cursor:grabbing}
+.ludo-piece.is-finished{z-index:4}
+@keyframes ludo-pawn-pulse{from{transform:scale(.96)}to{transform:scale(1.13)}}
+.ludo-drag-ghost{position:fixed;z-index:999;pointer-events:none;width:45px;height:45px;display:grid;place-items:center;background:radial-gradient(circle at 35% 25%,#fff8,var(--ghost-color,#eac36c));border:3px solid #fffad9;border-radius:50%;box-shadow:0 6px 20px #0009;color:#151e2e;font-weight:950;transform:translate(-50%,-50%)}
+.ludo-dragging .ludo-cell.ludo-drop-zone{outline:2px solid #fff7cb;outline-offset:-3px}
+.ludo-help{font-size:10px;line-height:1.4;color:#d8c8aa;text-align:center;max-width:560px;margin:8px auto 0}
+.ludo-control{min-width:0;min-height:0;padding:10px;background:linear-gradient(145deg,#222d48,#101a30);border-radius:14px;border:1px solid #465573;display:flex;flex-direction:column;gap:7px;align-self:center}
+.ludo-control .kicker{font-size:9px;letter-spacing:.13em}
+.ludo-control h3{margin:3px 0;font-size:14px;line-height:1.3}
+.ludo-player-list{display:grid;gap:4px}
+.ludo-player{min-width:0;display:flex;gap:7px;align-items:center;background:#141d33;border:1px solid #344363;border-radius:10px;padding:5px 7px}
+.ludo-player.active{border-color:#e7c374;background:#383347}
+.ludo-player b,.ludo-player small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ludo-player b{font-size:11px}.ludo-player small{font-size:9px;color:#b5c4d8}
+.ludo-dot{width:15px;height:15px;border-radius:50%;flex:none;border:2px solid #fff6}
+.ludo-dice{padding:7px;display:flex;flex-direction:column;align-items:center;gap:2px;background:#141e32;border:1px solid #544b61;border-radius:12px;min-height:102px}
+.ludo-dice>span{font-size:9px;font-weight:900;letter-spacing:.16em;color:#f0d18d}
+.ludo-dice small{font-size:10px;color:#bfd1eb}
+.ludo-die-scene{position:relative;width:56px;height:56px;perspective:220px;display:grid;place-items:center}
+.ludo-die-cube{--d:40px;position:absolute;left:8px;top:8px;width:var(--d);height:var(--d);opacity:0;transform-style:preserve-3d;transform:rotateX(-16deg) rotateY(20deg);filter:drop-shadow(1px 6px 4px #0006);transition:transform .38s ease-out}
+.ludo-die-face{position:absolute;inset:0;display:grid;grid-template:repeat(3,1fr)/repeat(3,1fr);padding:7px;gap:1px;background:linear-gradient(130deg,#fff,#d9dfe9);border:1px solid #94a2b2;border-radius:6px;backface-visibility:hidden;box-shadow:inset 0 0 0 1px #fff7}
+.ludo-die-face.side-1{transform:translateZ(20px)}.ludo-die-face.side-2{transform:rotateY(90deg) translateZ(20px)}.ludo-die-face.side-3{transform:rotateX(90deg) translateZ(20px)}.ludo-die-face.side-4{transform:rotateX(-90deg) translateZ(20px)}.ludo-die-face.side-5{transform:rotateY(-90deg) translateZ(20px)}.ludo-die-face.side-6{transform:rotateY(180deg) translateZ(20px)}
+.ludo-die-face .pip{height:100%;width:100%;background:#222a36;border-radius:50%;box-shadow:inset 0 1px 1px #0009}
+.pip-1{grid-area:1/1}.pip-3{grid-area:1/3}.pip-4{grid-area:2/1}.pip-5{grid-area:2/2}.pip-6{grid-area:2/3}.pip-7{grid-area:3/1}.pip-9{grid-area:3/3}
+.ludo-die-cube.face-1{transform:rotateX(-12deg) rotateY(13deg)}.ludo-die-cube.face-2{transform:rotateY(-80deg) rotateX(-10deg)}.ludo-die-cube.face-3{transform:rotateX(80deg) rotateY(12deg)}.ludo-die-cube.face-4{transform:rotateX(-80deg) rotateY(12deg)}.ludo-die-cube.face-5{transform:rotateY(80deg) rotateX(-10deg)}.ludo-die-cube.face-6{transform:rotateY(168deg) rotateX(-10deg)}
+.ludo-die-flat{width:43px;height:43px;display:grid;grid-template:repeat(3,1fr)/repeat(3,1fr);gap:2px;padding:8px;border-radius:8px;background:linear-gradient(130deg,#fff,#e6e5da 72%,#c0c8d2);border:1px solid #a3acaf;box-shadow:3px 5px 0 #a3a9af,4px 7px 10px #000a;transform:rotate(-7deg)}
+.ludo-die-flat .pip{width:100%;height:100%;background:#202838;border-radius:50%;box-shadow:inset 0 1px 2px #0008}
+.ludo-die-cube.is-rolling{opacity:1;animation:arena-roll .82s cubic-bezier(.28,.19,.49,.94) infinite}
+.ludo-die-scene:has(.ludo-die-cube.is-rolling) .ludo-die-flat{opacity:0}
+@keyframes arena-roll{0%{transform:rotateX(0) rotateY(0) rotateZ(0)}25%{transform:rotateX(175deg) rotateY(85deg) rotateZ(40deg)}55%{transform:rotateX(310deg) rotateY(260deg) rotateZ(105deg)}100%{transform:rotateX(720deg) rotateY(630deg) rotateZ(360deg)}}
+.ludo-clock{font-size:11px;color:#c2cadd}.ludo-clock strong{color:#f4c86a}
+.ludo-action{width:100%;min-height:34px;padding:7px!important;font-size:12px!important}
+.ludo-prompt{margin:0;font-size:11px;color:#e8cc8c;line-height:1.35}
+.ludo-notice{margin:0!important;font-size:10px!important;text-align:left!important;color:#d9c089;line-height:1.35;max-height:29px;overflow:hidden}
+.ludo-events summary{font-size:10px;color:#aabddd;cursor:pointer;padding:2px}
+.ludo-eventlog{font-size:10px;color:#9eabc6;max-height:65px;overflow-y:auto;padding:4px}
+.ludo-eventlog p{margin:0 0 5px!important;text-align:left!important;font-size:10px!important}
+.ludo-result{border:1px solid #987543;background:#392d29;border-radius:9px;padding:8px;display:grid;gap:5px}
+.ludo-result h3{font-size:12px}.ludo-result div{display:flex;justify-content:space-between;gap:8px;font-size:11px}
+.ludo-result .gain{color:#77e8a3}.ludo-result .loss{color:#ff9ba4}.ludo-result small{color:#c4aab4;font-size:9px}
+.ludo-intro{text-align:center;min-height:280px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:18px}
+.ludo-intro p{max-width:440px!important}.ludo-intro h3{font-size:21px}.ludo-intro .alert{max-width:450px}.ludo-dice-icon{font-size:62px}
+@media(max-width:1100px){.ludo-table-modal>.table-stage{grid-template-columns:minmax(0,1fr) 150px;gap:8px}.ludo-wrap{grid-template-columns:minmax(0,1fr) 166px;gap:8px}.ludo-wood-frame{width:min(51dvh,100%,480px)}.ludo-table-modal{padding:12px!important}}
+@media(max-width:850px){.ludo-table-modal>.table-stage{grid-template-columns:minmax(0,1fr)}.ludo-table-modal .stage-aside{display:none}.ludo-wood-frame{width:min(53dvh,100%,500px)}.ludo-table-modal .ludo-stage{align-items:center}}
+@media(max-width:620px){.ludo-table-modal{padding:9px!important;border-radius:13px}.ludo-table-modal>.modal-title{margin-bottom:4px}.ludo-table-modal>.modal-title h2{font-size:19px}.ludo-wrap{grid-template-columns:minmax(0,1fr)}.ludo-wood-frame{width:min(100%,53dvh,430px);padding:5px}.ludo-stage{overflow-y:auto;align-items:start!important}.ludo-control{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.ludo-control .ludo-status,.ludo-control .ludo-player-list,.ludo-control .ludo-prompt,.ludo-control .ludo-notice,.ludo-control .ludo-events,.ludo-control .ludo-result{grid-column:1/-1}.ludo-player-list{grid-template-columns:repeat(2,minmax(0,1fr))}.ludo-dice{min-height:95px}.ludo-help{font-size:9px}.ludo-table-modal .table-bottom-chat{margin-top:5px}.ludo-table-modal .chat-caption{padding:5px 9px}.ludo-table-modal .inline-compose{padding:4px}.ludo-table-modal .inline-compose input,.ludo-table-modal .inline-compose .btn{min-height:31px;height:32px}}
+@media(max-height:690px) and (min-width:621px){.ludo-wood-frame{width:min(48dvh,100%,410px)}.ludo-table-modal .stage-aside>.help{display:none}.ludo-control{gap:4px}.ludo-table-modal .table-bottom-chat{min-height:100px}.ludo-table-modal .two-line-log{height:36px}}
+@media(prefers-reduced-motion:reduce){.ludo-piece.can-move,.ludo-cell.ludo-drop-zone::after,.ludo-die-cube.is-rolling{animation:none!important}.ludo-piece{transition:none!important}}

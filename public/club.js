@@ -19,7 +19,7 @@ function selected(v,c){return v===c?' selected':'';}
 const fdate=value=>value?new Date(value).toLocaleDateString('tr-TR'):'Süresiz';
 function switchPage(page){state.page=page;if(page==='admin'&&!isStaff()){notice('Yönetim izniniz yok.',true);state.page='home';}render();if(page==='admin')loadAdmin();}
 function overlay(body,wide=false){$('#overlayRoot').innerHTML=`<div class="overlay" data-act="backdrop"><section class="modal${wide?' wide':''}" role="dialog" aria-modal="true">${body}</section></div>`;document.body.classList.add('modal-open');}
-function closeOverlay(){const box=$('#overlayRoot');box.textContent='';document.body.classList.remove('modal-open');state.table=null;}
+function closeOverlay(){const box=$('#overlayRoot');box.textContent='';document.body.classList.remove('modal-open');state.table=null;ludoFrame=null;ludoRollingUntil=0;if(ludoRollTimer)clearTimeout(ludoRollTimer);ludoRollTimer=null;ludoClearDrag();}
 const closeButton='<button type="button" class="close" data-act="close" title="Kapat">×</button>';
 function requireAuth(){if(state.me)return true;authModal();notice('Önce Arena Club hesabınla giriş yap.',true);return false;}
 function authModal(mode='login'){
@@ -59,39 +59,71 @@ function profilePage(){if(!state.me)return `<div class="panel" style="padding:30
  <section class="panel profile-content"><h3>Şifre değiştir</h3><form id="passwordForm" class="form-stack"><label class="field-label">Mevcut şifre<input type="password" name="old" required></label><label class="field-label">Yeni şifre (en az 10 karakter)<input type="password" name="password" minlength="10" required></label><button class="btn secondary" type="submit">Şifremi değiştir</button></form></section>
  <section class="panel profile-content"><h3>Son Kızma Birader maçlarım</h3><div id="recentMatches" class="help">Yükleniyor...</div></section><section class="panel profile-content"><h3>Onay taleplerim</h3><div id="myApprovals" class="help">Yükleniyor...</div></section></div></div>`;}
 // Ludo board is a presentation of authoritative state from /api/club, not a local game engine.
+// The classic game engine keeps the authoritative 52-square circuit. This display
+// projects those same indices onto a 14x14 perimeter inspired by a physical board.
 const ludoColors=['red','blue','yellow','green'];
 const ludoStarts=[0,13,26,39],ludoSafe=[0,8,13,21,26,34,39,47];
-const ludoTrack=[...Array.from({length:5},(_,i)=>[6,i+1]),...Array.from({length:6},(_,i)=>[5-i,6]),[0,7],...Array.from({length:6},(_,i)=>[i,8]),...Array.from({length:6},(_,i)=>[6,i+9]),[7,14],...Array.from({length:6},(_,i)=>[8,14-i]),...Array.from({length:6},(_,i)=>[9+i,8]),[14,7],...Array.from({length:6},(_,i)=>[14-i,6]),...Array.from({length:6},(_,i)=>[8,5-i]),[7,0],[6,0]];
-const ludoHome=[Array.from({length:5},(_,i)=>[7,i+1]),Array.from({length:5},(_,i)=>[i+1,7]),Array.from({length:5},(_,i)=>[7,13-i]),Array.from({length:5},(_,i)=>[13-i,7])];
-const ludoBase=[[[2,2],[4,2],[2,4],[4,4]],[[10,2],[12,2],[10,4],[12,4]],[[10,10],[12,10],[10,12],[12,12]],[[2,10],[4,10],[2,12],[4,12]]];
+const ludoTrack=[
+ ...Array.from({length:14},(_,x)=>[x,0]),
+ ...Array.from({length:13},(_,y)=>[13,y+1]),
+ ...Array.from({length:13},(_,x)=>[12-x,13]),
+ ...Array.from({length:12},(_,y)=>[0,12-y])
+];
+const ludoHome=[
+ [[1,1],[2,2],[3,3],[4,4],[5,5]],
+ [[12,1],[11,2],[10,3],[9,4],[8,5]],
+ [[12,12],[11,11],[10,10],[9,9],[8,8]],
+ [[1,12],[2,11],[3,10],[4,9],[5,8]]
+];
+const ludoBase=[
+ [[3,1],[4,1],[3,2],[4,2]],
+ [[9,1],[10,1],[9,2],[10,2]],
+ [[9,11],[10,11],[9,12],[10,12]],
+ [[3,11],[4,11],[3,12],[4,12]]
+];
+function ludoPos(color,steps,index=0){
+ if(steps<0)return ludoBase[color][index];
+ if(steps<=50)return ludoTrack[(ludoStarts[color]+steps)%52];
+ if(steps<56)return ludoHome[color][steps-51];
+ return [[6,6],[7,6],[7,7],[6,7]][color];
+}
+function ludoDice(value,rolling=false){
+ const face=Number(value)>=1&&Number(value)<=6?Number(value):1;
+ // Pip arrangements: rows and columns 1..3.
+ const pips={1:[5],2:[1,9],3:[1,5,9],4:[1,3,7,9],5:[1,3,5,7,9],6:[1,3,4,6,7,9]};
+ return `<div class="ludo-die-scene" aria-label="Zar: ${value||'atılmadı'}"><div class="ludo-die-flat">${pips[face].map(dot=>`<i class="pip pip-${dot}"></i>`).join('')}</div><div class="ludo-die-cube face-${face}${rolling?' is-rolling':''}">${[1,2,3,4,5,6].map(n=>`<div class="ludo-die-face side-${n}">${pips[n].map(dot=>`<i class="pip pip-${dot}"></i>`).join('')}</div>`).join('')}</div></div>`;
+}
 function ludoBoard(g){
- const pawnMap=new Map(),legal=new Set(g.legalMoves||[]);
+ const pawnMap=new Map(), legal=new Set(g.legalMoves||[]), targets=new Map();
  for(let seat=0;seat<g.players.length;seat++){
-  const player=g.players[seat],color=player.color;
-  player.pawns.forEach((steps,index)=>{
-   let coords;
-   if(steps<0)coords=ludoBase[color][index];
-   else if(steps<=50)coords=ludoTrack[(ludoStarts[color]+steps)%52];
-   else if(steps<56)coords=ludoHome[color][steps-51];
-   else coords=[7,7];
-   const key=coords.join(':');if(!pawnMap.has(key))pawnMap.set(key,[]);
-   pawnMap.get(key).push({seat,index,color,legal:g.mySeat===seat&&legal.has(index),finished:steps===56});
+  const p=g.players[seat],color=p.color;
+  p.pawns.forEach((steps,index)=>{
+   const coords=ludoPos(color,steps,index),key=coords.join(':');
+   if(!pawnMap.has(key))pawnMap.set(key,[]);
+   const legalMove=g.mySeat===seat&&legal.has(index);
+   pawnMap.get(key).push({seat,index,color,legal:legalMove,finished:steps===56});
+   if(legalMove){
+    const target=ludoPos(color,steps===-1?0:steps+g.dice,index),tk=target.join(':');
+    if(!targets.has(tk))targets.set(tk,[]);
+    targets.get(tk).push(index);
+   }
   });
  }
  const trackCells=new Map(ludoTrack.map(([x,y],i)=>[`${x}:${y}`,i]));
  const homeCells=new Map(ludoHome.flatMap((line,color)=>line.map(([x,y])=>[`${x}:${y}`,color])));
  let html='';
- for(let y=0;y<15;y++)for(let x=0;x<15;x++){
+ for(let y=0;y<14;y++)for(let x=0;x<14;x++){
   const key=`${x}:${y}`,track=trackCells.get(key),home=homeCells.get(key);
-  let type='neutral',star=false;
-  if(x<6&&y<6)type='base-red';else if(x>8&&y<6)type='base-blue';else if(x>8&&y>8)type='base-yellow';else if(x<6&&y>8)type='base-green';
+  let type='inner',star=false;
+  if(x<=6&&y<=6)type='base-red';else if(x>=7&&y<=6)type='base-blue';else if(x>=7&&y>=7)type='base-yellow';else type='base-green';
+  if(x>=6&&x<=7&&y>=6&&y<=7)type='finish';
   if(track!==undefined){type='track';star=ludoSafe.includes(track);if(ludoStarts.includes(track))type=`entry-${ludoColors[ludoStarts.indexOf(track)]}`;}
   if(home!==undefined)type=`home-${ludoColors[home]}`;
-  if(x===7&&y===7)type='finish';
-  const items=(pawnMap.get(key)||[]).map(p=>`<button type="button" class="ludo-piece ${ludoColors[p.color]}${p.legal?' can-move':''}" ${p.legal?`data-act="ludoPawn" data-pawn="${p.index}" title="${p.index+1}. piyonu ilerlet"`:'disabled'} aria-label="${ludoColors[p.color]} ${p.index+1}. piyon${p.legal?', oynanabilir':''}">${p.index+1}</button>`).join('');
-  html+=`<div class="ludo-cell ${type}" ${star?'title="Güvenli kare"':''}>${star?'<span class="ludo-star">★</span>':''}${items?`<div class="ludo-pieces">${items}</div>`:''}</div>`;
+  const landing=targets.get(key)||[];
+  const items=(pawnMap.get(key)||[]).map(p=>`<button type="button" class="ludo-piece ${ludoColors[p.color]}${p.legal?' can-move':''}${p.finished?' is-finished':''}" data-seat="${p.seat}" data-pawn="${p.index}" ${p.legal?`data-act="ludoPawn" title="${p.index+1}. piyonu seç veya hedefe sürükle" draggable="false"`:'disabled'} aria-label="${ludoColors[p.color]} ${p.index+1}. piyon${p.legal?', oynanabilir':''}"><span class="pawn-no">${p.index+1}</span></button>`).join('');
+  html+=`<div class="ludo-cell ${type}${landing.length?' ludo-drop-zone':''}" data-x="${x}" data-y="${y}" ${landing.length?`data-drop-pawns="${landing.join(',')}"`:''} ${star?'title="Güvenli kare"':''}>${star?'<span class="ludo-star">★</span>':''}${items?`<div class="ludo-pieces">${items}</div>`:''}</div>`;
  }
- return `<div class="ludo-board" role="group" aria-label="Kızma Birader 15 x 15 oyun tahtası">${html}</div>`;
+ return `<div class="ludo-wood-frame"><div class="ludo-board" role="group" aria-label="Kızma Birader 52 karelik dış hat ve 4 renkli bitiş yolları">${html}<div class="ludo-center-brand" aria-hidden="true">ARENA<br>CLUB</div></div></div>`;
 }
 function renderLudo(t){
  const lg=t.ludo,g=lg?.state;
@@ -99,19 +131,101 @@ function renderLudo(t){
  const active=g.players[g.turn],me=g.mySeat>=0?g.players[g.mySeat]:null,canRoll=!g.finished&&g.mySeat===g.turn&&g.phase==='roll'&&!me?.bot,canMove=!g.finished&&g.mySeat===g.turn&&g.phase==='move'&&!me?.bot;
  const results=lg.result;
  const score=results?`<section class="ludo-result"><h3>🏆 ${esc(g.players[g.winner]?.name||'Oyuncu')} kazandı!</h3>${results.points.map(p=>`<div><span>${esc(p.name)}</span><strong class="${p.delta>=0?'gain':'loss'}">${p.delta>=0?'+':''}${p.delta} puan</strong></div>`).join('')}<small>Sonuç sunucu tarafından işlendi. Aynı maça ikinci kez puan verilmez.</small></section>`:'';
- return `<div class="ludo-wrap"><div class="ludo-board-side">${ludoBoard(g)}<div class="ludo-help">★ güvenli kare · Altı atarak piyon çıkar · Son kareye tam zarla ulaş</div></div><div class="ludo-control"><div class="kicker">CANLI MAÇ · ${esc(lg.matchId.slice(0,8))}</div><h3>${g.finished?'Maç tamamlandı':`Sıra: ${esc(active?.name||'')}`}</h3><div class="ludo-player-list">${g.players.map((p,i)=>`<div class="ludo-player ${i===g.turn&&!g.finished?'active':''}"><span class="ludo-dot ${ludoColors[p.color]}"></span><div><b>${esc(p.name)}</b><small>${p.bot?'🤖 Bot oynuyor':i===g.mySeat?'Senin koltuğun':'Oyuncu'} · ${p.pawns.filter(n=>n===56).length}/4 biten</small></div></div>`).join('')}</div><div class="ludo-dice"><span>ZAR</span><strong>${g.lastRoll?.value||'–'}</strong><small>${g.phase==='move'?'Piyon seç':g.phase==='roll'?'Zar atılacak':'Maç bitti'}</small></div>${!g.finished?`<div class="ludo-clock">Kalan süre: <strong class="ludo-time" data-deadline="${g.deadline||0}">${Math.max(0,Math.ceil(((g.deadline||0)-Date.now())/1000))} sn</strong></div>`:''}${canRoll?'<button class="btn ludo-action" data-act="ludoRoll">🎲 Zarı at</button>':''}${canMove?`<p class="ludo-prompt">Tahtadaki parlayan piyonlarından birine dokun. ${g.legalMoves.length} geçerli hamle var.</p>`:''}${me?.bot&&!g.finished?'<button class="btn secondary ludo-action" data-act="ludoTakeover">Botun yerine geç</button>':''}${g.mySeat===-1&&!g.finished?'<p class="help">İzleyicisin. Masayı ve sohbeti takip edebilirsin.</p>':''}${score}${g.finished&&(t.ownerId===state.me?.id||state.me?.role==='admin')?'<button class="btn ludo-action" data-act="ludoStart">Yeni maç başlat</button>':''}<p class="ludo-notice">${esc(g.notice||'')}</p><div class="ludo-eventlog">${(g.events||[]).slice(-5).reverse().map(x=>`<p>${esc(x)}</p>`).join('')}</div></div></div>`;
+ return `<div class="ludo-wrap"><div class="ludo-board-side">${ludoBoard(g)}<div class="ludo-help">★ Güvenli alan · 6 ile başlangıç · 4 piyonu eve götür · Piyonu tıkla veya hedefe sürükle</div></div><div class="ludo-control"><div class="ludo-status"><div class="kicker">CANLI MAÇ · ${esc(lg.matchId.slice(0,8))}</div><h3>${g.finished?'Maç tamamlandı':`Sıra: ${esc(active?.name||'')}`}</h3></div><div class="ludo-player-list">${g.players.map((p,i)=>`<div class="ludo-player ${i===g.turn&&!g.finished?'active':''}"><span class="ludo-dot ${ludoColors[p.color]}"></span><div><b>${esc(p.name)}</b><small>${p.bot?'🤖 Bot oynuyor':i===g.mySeat?'Senin koltuğun':'Oyuncu'} · ${p.pawns.filter(n=>n===56).length}/4 biten</small></div></div>`).join('')}</div><div class="ludo-dice"><span>ZAR</span>${ludoDice(g.lastRoll?.value)}<small>${g.phase==='move'?'Piyonunu seç':g.phase==='roll'?'Sıra zar atışında':'Maç bitti'}</small></div>${!g.finished?`<div class="ludo-clock">Kalan süre: <strong class="ludo-time" data-deadline="${g.deadline||0}">${Math.max(0,Math.ceil(((g.deadline||0)-Date.now())/1000))} sn</strong></div>`:''}${canRoll?'<button class="btn ludo-action" data-act="ludoRoll">🎲 Zarı at</button>':''}${canMove?`<p class="ludo-prompt">${g.legalMoves.length} geçerli piyon var. Seçip dokunabilir veya hedefe sürükleyebilirsin.</p>`:''}${me?.bot&&!g.finished?'<button class="btn secondary ludo-action" data-act="ludoTakeover">Botun yerine geç</button>':''}${g.mySeat===-1&&!g.finished?'<p class="help">İzleyicisin, masayı ve sohbeti takip edebilirsin.</p>':''}${score}${g.finished&&(t.ownerId===state.me?.id||state.me?.role==='admin')?'<button class="btn ludo-action" data-act="ludoStart">Yeni maç başlat</button>':''}<p class="ludo-notice">${esc(g.notice||'')}</p><details class="ludo-events"><summary>Hamle geçmişi</summary><div class="ludo-eventlog">${(g.events||[]).slice(-8).reverse().map(x=>`<p>${esc(x)}</p>`).join('')}</div></details></div></div>`;
 }
 function fullTable(t){const players=t.members.filter(m=>m.as==='player'),spectators=t.members.filter(m=>m.as==='spectator');return `<div class="modal-title"><div><div class="kicker">${esc(h(t.game).toUpperCase())} / MASA ${t.no}</div><h2>Masa ${String(t.no).padStart(2,'0')}</h2><div class="help">Masa sahibi: ${userName(state.users.find(u=>u.id===t.ownerId)||t.members.find(m=>m.user.id===t.ownerId)?.user)} · <span id="tableConnectivity">${players.length}/${t.maxPlayers} oyuncu · ${players.filter(m=>m.connected).length} bağlantı doğrulandı</span></div></div>${closeButton}</div>
  <div class="table-stage">${t.game==='ludo'?`<div class="stage ludo-stage" id="ludoArea">${renderLudo(t)}</div>`:`<div class="stage"><span class="stage-symbol">${icons[t.game]||'🎲'}</span><h3>Oyun masası hazırlanıyor</h3><p>Bu bölüm şimdilik salon ve masa altyapısıdır. Oyun motorları bağlandığında burada gerçek, geniş oyun tahtası açılacak.</p><div class="seat-row" id="seatRow">${playerSeats(t)}</div><span class="pill">${t.rounds?`${t.rounds} el`:`${t.points} başlangıç puanı`} · ${t.turnSeconds} sn</span></div>`}
  <aside class="stage-aside"><h3>Masa ayarları</h3><div class="info-list"><div>Oyun: <b>${esc(h(t.game))}</b></div><div>İzleyici: <b>${t.spectators?'Açık':'Kapalı'}</b></div><div>Özel mesaj: <b>${t.privateChat?'Açık':'Kapalı'}</b></div><div>Oyuncu: <b>${players.length}/${t.maxPlayers}</b></div><div>İzleyici: <b>${spectators.length}</b></div></div><div class="member-list" style="margin-top:10px;padding:0">${spectators.map(m=>`<button class="user-chip" type="button" data-act="player" data-id="${m.user.id}">${avatar(m.user)}${userName(m.user)}</button>`).join('')}</div><div class="form-stack" style="margin-top:16px">${state.me&&(state.me.id===t.ownerId||state.me.role==='admin')?'<button data-act="tableSettings" class="btn secondary small">Masa kurallarını düzenle</button>':''}<button data-act="leaveTable" class="btn danger small">Masadan ayrıl</button></div><p class="help" style="margin-top:14px">Masa sohbetini hemen aşağıdan kullanabilirsin. İzleyiciler de masa sahibinin izniyle yazabilir.</p></aside></div>
  <div class="table-bottom-chat"><div class="chat-caption"><span>💬 Masa sohbeti</span><small>İki satır · Geçmişi kaydır</small></div><div class="two-line-log" id="tableChatLines">${tableMessages(t)}</div><form id="tableChatForm" class="inline-compose"><input name="message" maxlength="240" placeholder="Masadakilere mesaj yaz..." required><button class="btn small">Gönder</button></form></div>`;}
+// Browser-only motion. The API still validates the dice and every pawn move.
+let ludoFrame=null,ludoMoveBusy=false,ludoDrag=null,suppressPawnClickUntil=0,ludoRollingUntil=0,ludoRollTimer=null;
+const ludoSnapshot=t=>t?.ludo?.state?{
+ id:t.ludo.matchId,
+ pawns:t.ludo.state.players.map(p=>[...p.pawns]),
+ colors:t.ludo.state.players.map(p=>p.color)
+}:null;
+function ludoRenderKey(t){
+ const g=t?.ludo?.state;
+ if(!g)return `waiting:${(t.members||[]).map(m=>[m.user?.id,m.connected,m.as].join(':')).join('|')}:${t.maxPlayers}`;
+ return `${t.ludo.matchId}|${g.revision}|${g.turn}|${g.phase}|${g.dice}|${g.lastRoll?.value}|${g.finished}|${g.players.map(p=>p.pawns.join(',')+p.bot).join('|')}|${Boolean(t.ludo.result)}`;
+}
+function ludoAnimateMoves(before,after,root){
+ if(!before||!after||before.id!==after.id||!root||window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)return;
+ const board=root.querySelector('.ludo-board');if(!board)return;
+ const stepSize=board.getBoundingClientRect().width/14;
+ for(let seat=0;seat<after.pawns.length;seat++)for(let index=0;index<4;index++){
+  const from=before.pawns[seat]?.[index],to=after.pawns[seat]?.[index];
+  if(!Number.isInteger(from)||!Number.isInteger(to)||to<=from||to-from>6)continue;
+  const node=root.querySelector(`.ludo-piece[data-seat="${seat}"][data-pawn="${index}"]`);
+  if(!node?.animate)continue;
+  const color=after.colors[seat],end=ludoPos(color,to,index),coords=[];
+  if(from===-1)coords.push(ludoPos(color,-1,index));
+  for(let step=Math.max(0,from);step<=to;step++)coords.push(ludoPos(color,step,index));
+  if(coords.length<2)continue;
+  node.animate(coords.map(([x,y],j)=>({offset:j/(coords.length-1),transform:`translate(${(x-end[0])*stepSize}px,${(y-end[1])*stepSize}px) scale(${j===coords.length-1?1:1.09})`})),{duration:Math.min(1350,Math.max(330,(coords.length-1)*145)),easing:'ease-in-out'});
+ }
+}
+function ludoStartDiceAnimation(){
+ ludoRollingUntil=Date.now()+800;
+ const node=document.querySelector('#ludoArea .ludo-die-cube');if(node)node.classList.add('is-rolling');
+ const button=document.querySelector('#ludoArea [data-act="ludoRoll"]');if(button)button.disabled=true;
+}
+async function ludoSendPawn(index){
+ if(ludoMoveBusy||!Number.isInteger(index)||!state.table)return;
+ ludoMoveBusy=true;
+ try{const t=state.table;const r=await api('/table/ludo/move','POST',{roomId:t.roomId,no:t.no,pawn:index});
+  if(state.table?.roomId===t.roomId&&state.table?.no===t.no)updateTable(r.table);
+ }catch(e){notice(e.message,true);}finally{ludoMoveBusy=false;}
+}
+function ludoClearDrag(){
+ if(ludoDrag?.ghost)ludoDrag.ghost.remove();
+ document.documentElement.classList.remove('ludo-dragging');ludoDrag=null;
+}
+document.addEventListener('pointerdown',e=>{
+ const piece=e.target.closest?.('#ludoArea .ludo-piece.can-move');
+ if(!piece||e.button!==0||ludoMoveBusy)return;
+ ludoDrag={pointer:e.pointerId,x:e.clientX,y:e.clientY,pawn:Number(piece.dataset.pawn),color:ludoColors.find(color=>piece.classList.contains(color)),moving:false,ghost:null};
+});
+document.addEventListener('pointermove',e=>{
+ if(!ludoDrag||ludoDrag.pointer!==e.pointerId)return;
+ const drag=ludoDrag;
+ if(!drag.moving&&Math.hypot(e.clientX-drag.x,e.clientY-drag.y)>9){
+  drag.moving=true;document.documentElement.classList.add('ludo-dragging');
+  const ghost=document.createElement('div');ghost.className='ludo-drag-ghost';ghost.textContent=String(drag.pawn+1);
+  ghost.style.setProperty('--ghost-color',({red:'#e95e69',blue:'#56a8ee',yellow:'#efcc58',green:'#50c6a0'})[drag.color]||'#ead08c');
+  document.body.append(ghost);drag.ghost=ghost;
+ }
+ if(drag.moving){drag.ghost.style.left=e.clientX+'px';drag.ghost.style.top=e.clientY+'px';e.preventDefault();}
+},{passive:false});
+document.addEventListener('pointerup',e=>{
+ if(!ludoDrag||ludoDrag.pointer!==e.pointerId)return;
+ const drag=ludoDrag;
+ if(drag.moving){
+  suppressPawnClickUntil=Date.now()+250;
+  const cell=document.elementFromPoint(e.clientX,e.clientY)?.closest?.('#ludoArea .ludo-cell');
+  const valid=cell?.dataset.dropPawns?.split(',').includes(String(drag.pawn));
+  if(valid)void ludoSendPawn(drag.pawn);
+  else notice('Piyonu parlayan hedef karesine bırak. İstersen doğrudan piyona da tıklayabilirsin.');
+ }
+ ludoClearDrag();
+});
+document.addEventListener('pointercancel',ludoClearDrag);
+
+
 function playerSeats(t){return t.members.filter(m=>m.as==='player').map(m=>`<button type="button" class="seat" data-act="player" data-id="${m.user.id}">${avatar(m.user)} ${userName(m.user)} ✉</button>`).join('')||'<div class="seat">Oyuncular bekleniyor...</div>';}
 function tableMessages(t){return t.chat.map(m=>`<p><b>${userName(m.user)}:</b> ${esc(m.message)}</p>`).join('')||'<p class="subtle">Henüz mesaj yok.</p>';}
 function updateTable(t){state.table=t;const root=$('#overlayRoot');if(!root.querySelector('.table-bottom-chat'))return;const connectivity=$('#tableConnectivity');if(connectivity){const players=t.members.filter(m=>m.as==='player');connectivity.textContent=`${players.length}/${t.maxPlayers} oyuncu · ${players.filter(m=>m.connected).length} bağlantı doğrulandı`;}const area=$('#tableChatLines');if(area){const nearBottom=area.scrollHeight-area.scrollTop-area.clientHeight<28;area.innerHTML=tableMessages(t);if(nearBottom)area.scrollTop=area.scrollHeight;}
  const seats=$('#seatRow');if(seats)seats.innerHTML=playerSeats(t);
- const ludo=$('#ludoArea');if(ludo)ludo.innerHTML=renderLudo(t);
+ const ludo=$('#ludoArea');
+ if(ludo){const key=ludoRenderKey(t);
+  if(!ludoFrame||ludoFrame.key!==key){
+   if(Date.now()<ludoRollingUntil){
+    if(!ludoRollTimer)ludoRollTimer=setTimeout(()=>{ludoRollTimer=null;if(state.table&&document.querySelector('#ludoArea'))updateTable(state.table);},Math.max(40,ludoRollingUntil-Date.now()+10));
+   }else{const before=ludoFrame?.snapshot;ludo.innerHTML=renderLudo(t);ludoAnimateMoves(before,ludoSnapshot(t),ludo);ludoFrame={key,snapshot:ludoSnapshot(t)};}
+  }
+ }
 }
-function tableModal(t){state.returnTable=null;state.table=t;overlay(fullTable(t),true);const el=$('#tableChatLines');if(el)el.scrollTop=el.scrollHeight;}
+function tableModal(t){state.returnTable=null;state.table=t;ludoFrame=t.game==='ludo'?{key:ludoRenderKey(t),snapshot:ludoSnapshot(t)}:null;overlay(fullTable(t),true);if(t.game==='ludo')$('#overlayRoot .modal')?.classList.add('ludo-table-modal');const el=$('#tableChatLines');if(el)el.scrollTop=el.scrollHeight;}
 function tablePick(no){if(!requireAuth())return;const table=state.tables.find(t=>t.no===no);if(!table?.ownerId){tableConfigModal(no);return;}
  overlay(`<div class="modal-title"><div><div class="kicker">SALON MASASI</div><h2>Masa ${no} — ${esc(h(table.game))}</h2></div>${closeButton}</div><p class="subtle">Masa ${table.players}/${table.max} oyuncu. İster oyuncu olarak katıl, ister izleyici olarak sohbeti takip et.</p><div class="form-stack"><button data-act="joinSeat" data-no="${no}" class="btn" ${table.players>=table.max&&!table.playing?'disabled':''}>Oyuncu olarak masaya otur</button><button data-act="joinSpectator" data-no="${no}" class="btn secondary" ${table.locked?'disabled':''}>İzleyici olarak katıl</button></div>`);
 }
@@ -197,12 +311,15 @@ async function act(el){const name=el.dataset.act,id=el.dataset.id,no=Number(el.d
  case 'joinTournament':{if(!requireAuth())break;await api('/tournament/join','POST',{id});state.tournaments=(await api('/tournaments')).tournaments;render();notice('Turnuvaya kaydoldun.');break;}
   case 'chooseTable':tablePick(no);break;
   case 'ludoStart':{const t=state.table;if(!t)break;const r=await api('/table/ludo/start','POST',{roomId:t.roomId,no:t.no});updateTable(r.table);notice('Kızma Birader maçı başladı.');break;}
-  case 'ludoRoll':case 'ludoPawn':case 'ludoTakeover':{
-   const t=state.table;if(!t)break;
-   const suffix=name==='ludoRoll'?'roll':name==='ludoPawn'?'move':'takeover';
-   const payload={roomId:t.roomId,no:t.no,...(suffix==='move'?{pawn:Number(el.dataset.pawn)}:{})};
-   const r=await api(`/table/ludo/${suffix}`,'POST',payload);updateTable(r.table);break;
-  }
+  case 'ludoPawn':if(Date.now()>suppressPawnClickUntil)await ludoSendPawn(Number(el.dataset.pawn));break;
+  case 'ludoRoll':{const t=state.table;if(!t)break;
+   ludoStartDiceAnimation();
+   try{const [r]=await Promise.all([api('/table/ludo/roll','POST',{roomId:t.roomId,no:t.no}),new Promise(resolve=>setTimeout(resolve,850))]);
+    if(state.table?.roomId===t.roomId&&state.table?.no===t.no)updateTable(r.table);
+   }catch(err){ludoRollingUntil=0;const button=document.querySelector('#ludoArea [data-act="ludoRoll"]');if(button)button.disabled=false;
+    document.querySelector('#ludoArea .ludo-die-cube')?.classList.remove('is-rolling');throw err;}
+   break;}
+  case 'ludoTakeover':{const t=state.table;if(!t)break;const r=await api('/table/ludo/takeover','POST',{roomId:t.roomId,no:t.no});updateTable(r.table);break;}
 
  case 'joinSeat':case 'joinSpectator':{const d=await api('/table/join','POST',{roomId:state.roomId,no,as:name==='joinSeat'?'player':'spectator'});tableModal(d.table);break;}
  case 'leaveTable':await api('/table/leave','POST',{});closeOverlay();notice('Masadan ayrıldın.');break;
