@@ -3,6 +3,8 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install --omit=dev --no-audit --no-fund
 COPY server.js scoring.js tombala.js mulk.js ludo.js arena-auth.js ./
+COPY club ./club
+RUN mkdir -p /app/data && chown -R node:node /app/data
 COPY public ./public
 ENV NODE_ENV=production PORT=3000
 EXPOSE 3000

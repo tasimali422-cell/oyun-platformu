@@ -1,4 +1,5 @@
 import { verifyArenaTicket } from './arena-auth.js';
+import { createClub } from './club/platform.js';
 import { startMulk, actMulk, tickMulk, viewMulk, bankruptMulk } from './mulk.js';
 import { startLudo, rollLudo, moveLudo, tickLudo, forfeitLudo, viewLudo } from './ludo.js';
 import { TOMBALA_MAX_PLAYERS, setupTombala, distribute, userView, markNumber, drawNumber, finalizeClaims } from './tombala.js';
@@ -11,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { WebSocketServer, WebSocket } from 'ws';
 
 const base = path.join(path.dirname(fileURLToPath(import.meta.url)), 'public');
+const club = createClub();
 const port = Number(process.env.PORT || 3000);
 const AUTH_SECRET=process.env.ARENA_SSO_SECRET||'';
 const WP_ORIGIN=(process.env.ARENA_WP_ORIGIN||'').replace(/\/$/,'');
@@ -42,15 +44,27 @@ function leave(ws){const state=clients.get(ws);if(!state?.room)return;const room
 function dropDisconnected(ws){const u=clients.get(ws);if(!u||u.active)return;const token=u.token;if(token)reconnectTokens.delete(token);leave(ws);clients.delete(ws);broadcast();}
 const server = http.createServer((req,res)=>{
   const url=new URL(req.url||'/','http://localhost');
+  if(url.pathname.startsWith('/api/club/')){club.handle(req,res,url);return;}
   if(url.pathname==='/health'){res.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify({ok:true}));return;}
   if(req.method!=='GET'&&req.method!=='HEAD'){res.writeHead(405).end();return;}
   let filename;try{filename=decodeURIComponent(url.pathname);}catch{res.writeHead(400).end();return;}
   if(filename==='/'||filename==='/index.html')filename='/index.html';
+  if(filename==='/club'||filename==='/club/')filename='/club.html';
   const full=path.resolve(base,'.'+filename);
   if(!full.startsWith(base+path.sep)){res.writeHead(403).end();return;}
-  fs.stat(full,(err,stat)=>{if(err||!stat.isFile()){res.writeHead(404).end('Not found');return;}res.writeHead(200,{'Content-Type':mime[path.extname(full)]||'application/octet-stream','X-Content-Type-Options':'nosniff','Cache-Control':'no-store','Content-Security-Policy':`default-src 'self'; connect-src 'self' ws: wss:; img-src 'self' data: https:; style-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors ${frameAncestors}`});if(req.method==='HEAD'){res.end();return;}fs.createReadStream(full).pipe(res);});
+  fs.stat(full,(err,stat)=>{if(err||!stat.isFile()){res.writeHead(404).end('Not found');return;}res.writeHead(200,{'Content-Type':mime[path.extname(full)]||'application/octet-stream','X-Content-Type-Options':'nosniff','Cache-Control':'no-store','Content-Security-Policy':`default-src 'self'; connect-src 'self' ws: wss:; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors ${frameAncestors}`});if(req.method==='HEAD'){res.end();return;}fs.createReadStream(full).pipe(res);});
 });
-const wss=new WebSocketServer({server,maxPayload:4096});
+const wss=new WebSocketServer({noServer:true,maxPayload:4096});
+server.on('upgrade',(req,socket,head)=>{
+  const pathname=new URL(req.url||'/', 'http://localhost').pathname;
+  const origin=req.headers.origin;
+  if(pathname==='/club/ws'){
+    if(origin){try{if(new URL(origin).host!==req.headers.host){socket.destroy();return;}}catch{socket.destroy();return;}}
+    if(!club.getSession(req)){socket.destroy();return;}
+    club.wss.handleUpgrade(req,socket,head,ws=>club.wss.emit('connection',ws,req));
+  }else if(pathname==='/'){wss.handleUpgrade(req,socket,head,ws=>wss.emit('connection',ws,req));}
+  else socket.destroy();
+});
 wss.on('connection',ws=>{
   clients.set(ws,{room:null,name:'Misafir',lastAction:0,lastChat:0,active:true,token:null,wpId:null,authenticated:false,avatar:''});send(ws,{type:'hello',message:'Oyun sunucusuna bağlandın.'});broadcast();
   ws.on('message',buf=>{
@@ -199,4 +213,4 @@ setInterval(()=>{
     notifyRoom(room);broadcast();
   }
 },1000).unref();
-server.listen(port,'0.0.0.0',()=>console.log(`Arena Club games v1.5 listening on ${port}`));
+server.listen(port,'0.0.0.0',()=>console.log(`Arena Club games v1.5 + Club script v2.0 listening on ${port}`));

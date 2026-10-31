@@ -1,0 +1,41 @@
+ARENA CLUB V2.0 — KOLAY KURULUM
+
+ÖNCE: GitHub ve Coolify yedeğini al. ZIP'i bilgisayarda aç.
+
+1) GitHub: tasimali422-cell/oyun-platformu > Add file > Upload files
+   ZIP'in kendisini DEĞİL içindeki bütün dosya ve klasörleri deponun ANA DİZİNİNE yükle.
+   server.js ve package.json deponun ana dizininde olmalı; club ve public klasörleri de görünmeli.
+   Commit changes düğmesine bas.
+
+2) Coolify: Oyun Platformu > production > oyun-platformu-web > Environment Variables
+   + Add > Name: ARENA_CLUB_ADMIN_EMAIL
+           Value: [sana ait e-posta adresin]
+   + Add > Name: ARENA_CLUB_ADMIN_PASSWORD
+           Value: [en az 12 karakterli kendine özel kuvvetli şifre]
+   Runtime açık olsun. Şifreyi ekran görüntüsünde paylaşma.
+   Mevcut ARENA_SSO_SECRET / ARENA_WP_ORIGIN ayarlarına DOKUNMA.
+
+3) Coolify: oyun-platformu-web > Configuration > Persistent Storage
+   Add > Volume Mount
+   Name: arena-club-data
+   Destination Path: /app/data
+   Add / Save
+   ÖNEMLİ: Kayıtlar ve fotoğraflar bu kalıcı klasöre yazılır; bu adımı atlama!
+
+4) Coolify: Redeploy. 'Running' durumuna dönmeli.
+
+5) TARAYICIDA: https://oyuna.top/club
+   Sağ üstten Giriş Yap > yukarıda belirlediğin e-posta + şifre.
+   Yönetim menüsü açılmalı. Ana sayfada varsayılan Kızma Birader salonu 40 masadır.
+
+6) Bir başka tarayıcıdan Üye Ol, normal üye oluştur.
+   Salonlar > salona gir > boş masa seç > oyun türü ve kurallarını seç.
+   Masayı aç > sohbeti ve ayarları dene.
+
+7) Yönetim: Kullanıcıya VIP / ELITE ver, salonu kirala, profil ve fotoğraf onayını dene.
+
+UYARI: Yeni salon masasındaki OYUN MOTORLARI BU SÜRÜMDE BAĞLI DEĞİLDİR.
+Önceki oyunlar: https://oyuna.top/
+Yeni sosyal platform: https://oyuna.top/club
+
+GitHub/Coolify adımları ve teknik detaylar README.md içinde.

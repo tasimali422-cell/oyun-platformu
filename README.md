@@ -1,64 +1,74 @@
-# Arena Club Oyun Platformu v1.5 — Kızma Birader (Ludo)
+# Arena Club v2.0 — Üyelik, Salonlar, Sohbet ve Yönetim Scripti
 
-Bu paket, kullanıcının **v1.4 Mülk Turu** ZIP'i esas alınarak hazırlanmış **tam GitHub kaynak kodu** paketidir. `server.js` ve `public/app.js` mevcut lobiye sadece yeni Ludo olaylarını bağlayacak şekilde güncellendi. `tombala.js`, `mulk.js`, `scoring.js` ve mevcut oyun test dosyalarına dokunulmadı. **WordPress teması ve Core eklentisi değiştirilmiyor.**
+Bu, `oyun-platformu` v1.5 Kızma Birader ZIP'i baz alınarak hazırlanmış **tam kaynak kodu paketidir**. Mevcut oyun motorları (`ludo.js`, `mulk.js`, `tombala.js`, `scoring.js`, `public/app.js`) değiştirilmedi. Eski oyun uygulaması `/` adresinde çalışmaya devam eder, yeni Arena Club platformu `/club` adresindedir.
 
-## Dosyaları yükleme — kod bilmen gerekmiyor
+## Kurulum — daha önce Node.js kullanmamış kullanıcı için
 
-1. Mevcut GitHub deponun ve Coolify uygulamanın bir yedeğini al.
-2. `arena-club-oyun-platformu-v1.5-ludo.zip` dosyasını bilgisayarda açıp **içindeki dosyaları çıkar**.
-3. GitHub > `tasimali422-cell/oyun-platformu` deposunun **ana dizinine** gir. ZIP içeriğindeki dosyaları buraya yükle. `public/` klasörü ana dizinde kalmalı. Yeni bir üst klasör oluşturma.
-4. GitHub `Commit changes` ile kaydet. **README, Dockerfile, public/** dahil bütün paket dosyalarını güncelle; `mulk.js`, `tombala.js`, `scoring.js` aynı kalır.
-5. Coolify > mevcut **oyun-platformu-web** uygulaması > **Redeploy**. Yeni hizmet, PostgreSQL veya Redis oluşturma.
-6. Dağıtımdan sonra `https://oyuna.top/health` adresinin `{"ok":true}` döndürdüğünü kontrol et.
-7. `https://oyuna.top/` adresinde **Kızma Birader** kartını seç. **2 oyuncu** veya **4 oyuncu** masası aç; oda kodunu arkadaşına gönder. Karşı taraf açık masalardan ya da kodla katılır. Oyuncular tamamlanınca masa sahibi **Oyunu başlat** düğmesine basar.
-8. İlk denemeyi ayrı cihazlarda ve ayrı sekmelerde/oturumlarda gerçek kullanıcılarla yap.
+1. **İlk olarak** mevcut GitHub deponun ve Coolify projenin yedeğini al. Mümkünse önce ayrı bir test uygulamasında dene. ZIP'in içindeki dosyaları bilgisayarına çıkar; ZIP'in kendisini GitHub'a yükleme.
+2. GitHub `tasimali422-cell/oyun-platformu` deposunda ana dizine bu paketin **içindeki dosyaları** yükle. `server.js`, `Dockerfile`, `package.json`, `club/` ve `public/` deponun kökünde olmalı. GitHub `Commit changes` yap.
+3. Coolify > `oyun-platformu-web` > **Environment Variables** > **+ Add** ile şu iki **yeni** değişkeni oluştur:
+   - **Name** `ARENA_CLUB_ADMIN_EMAIL` — **Value** yönetici olarak kullanacağın e-posta adresi
+   - **Name** `ARENA_CLUB_ADMIN_PASSWORD` — **Value** senin seçeceğin, en az 12 karakterli güçlü, benzersiz yönetici şifresi
+   - Bunların ikisi de **Runtime: Available in the container** olmalı. Build time kapatılabilir. Şifreyi kimseyle paylaşma veya ekran görüntüsünde gösterme. Mevcut `ARENA_SSO_SECRET` ve `ARENA_WP_ORIGIN` değişkenlerini **silme**; eski WordPress bağlantısı bunları kullanıyor.
+4. **Önemli — kalıcı kullanıcı verileri:** Coolify > aynı uygulama > **Configuration > Persistent Storage > Add > Volume Mount** menüsünü aç. Bir **Name** belirle (`arena-club-data` gibi); **Destination Path** alanına **`/app/data`** gir ve kaydet. Bu, üye kayıtlarının, fotoğrafların, VIP ayarlarının, salonların ve moderasyon kayıtlarının redeploy sırasında kaybolmaması için zorunludur. Yeni veriyi oluşturmadan önce volume'u hazırla. Uygulama container'ında `/app/data` klasörüne yazma izni bulunmalıdır.
+5. Coolify'da **Redeploy** yap. `Running` olduktan sonra `https://oyuna.top/health` adresinde `{"ok":true}` görmelisin.
+6. **Yeni siteyi aç:** `https://oyuna.top/club` (kendi alan adın farklıysa ona göre değiştir). Sağ üstten yönetici e-posta/şifrenle giriş yap.
+7. **Yönetim** menüsünden salonları aç, masa sayısını belirle, üyelere VIP/ELITE/moderatör ata, onayları işle, duyuru yayımla ve turnuvaları ayarla. İlk kurulumda 40 masalık bir Kızma Birader salonu otomatik görünür.
+8. Başka bir tarayıcı veya telefonda **Üye Ol** ile normal hesap oluştur. Salona gir, masa seç ve masa sohbetini dene. VIP seviyesini yönetici panelinden vererek VIP sohbetini kontrol et.
 
-**Önemli:** Paket dosyalarını bir klasör hâlinde GitHub'a yükleme; projenin kökünde `server.js`, `package.json`, `Dockerfile`, `ludo.js` ve `arena-auth.js` görünmeli. `public/ludo.css` ve `public/app.js` da `public` içinde olmalı.
+**NOT:** Yönetici hesabı yalnızca hiç yönetici yoksa ilk açılışta oluşturulur. Kullanıcı verileri kalıcı volume'a yazıldıktan ve giriş doğrulandıktan sonra `ARENA_CLUB_ADMIN_PASSWORD` değişkenini kaldırabilirsin; bu mevcut yöneticinin şifresini değiştirmez. Sonra yönetici paneline giriş yapmak için oluşturduğun şifreyi kullan. Yönetici şifresini profilindeki **Şifre değiştir** alanından değiştirebilirsin.
 
-## WordPress ile giriş (ayrı ZIP)
+## Dosya yapısı
 
-WordPress'te `arena-club-ludo-bridge-v1.0.zip` eklentisini etkinleştir. Otomatik olarak **Oyna > Kızma Birader** sayfasını (`/oyna/kizma-birader/`) açar; önceden aynı sayfa varsa mevcut içeriği değiştirmez, gerekirse o sayfaya `[arena_ludo]` ekle.
+```
+server.js               → Mevcut oyun motoru + yeni API/WebSocket bağlantısı
+club/platform.js        → Üyelik, onay, salon, masa, sohbet, yönetim, turnuva API'leri
+club/platform.test.js   → Yeni fonksiyon testleri
+public/club.html        → Yeni Arena Club ana sayfa ve uygulama
+public/club.css         → Masaüstü + mobil tasarım
+public/club.js          → Üye, salon, masa ve admin arayüzü
+public/index.html       → Mevcut oyun arayüzü (yeni salona menü linki eklendi)
+public/app.js           → Mevcut oyun arayüzü, değişmedi
+ludo.js, mulk.js, tombala.js, scoring.js, arena-auth.js → Mevcut motorlar
+Dockerfile              → club klasörünü kopyalıyor, /app/data klasörünü oluşturuyor
+```
 
-1. WordPress yönetim panelinden **Ayarlar > Arena Club Ludo** bölümünü aç.
-2. Sunucu adresini `https://oyuna.top/` olarak bırak.
-3. Ekranda gördüğün iki satırı, Coolify'da mevcut `oyun-platformu-web` uygulamasının **Environment Variables** kısmına kopyala:
-   - `ARENA_SSO_SECRET`: WordPress'teki **Coolify ARENA_SSO_SECRET** alanının gizli değeri (kimseyle paylaşma).
-   - `ARENA_WP_ORIGIN`: WordPress'teki **Coolify ARENA_WP_ORIGIN** değeri (ör. `https://kayseritb.org`, sonunda `/` yok).
-4. Coolify'da kaydedip **Redeploy** yap.
-5. WordPress'e giriş yapmış bir hesapla `/oyna/kizma-birader/` sayfasını aç. Oyuncu oyun sunucusuna **WordPress şifresi gönderilmeden** kısa ömürlü imzalı bilet ile bağlanır. Sayfayı WordPress girişinden açmazsan oyun alanı yerine giriş bağlantısı görünür.
-6. İki ayrı WordPress hesabı ile iki farklı tarayıcı/cihaz kullanarak oyun testi yap. Bu modda doğrudan `oyuna.top` üzerinden misafir maçı açılamaz (sunucu hesap doğrulaması ister).
+## Eklenen gerçek özellikler
 
-**SSO zorunlu ayarları girilmezse:** Node.js uygulaması eski misafir modunda çalışmaya devam eder. WordPress hesabıyla güvenli giriş **aktif değildir**. Bu, ilk aşamada oyunu yalnız doğrudan `oyuna.top` üzerinde denemek için kullanılabilir.
+- Yeni Arena Club üyelik, kayıt, giriş ve çıkış; güvenli şifre hash'i (scrypt); HttpOnly oturum cookie; isteklere CSRF koruması.
+- Üye profilinde görünen ad, bio, e-posta, VIP/ELITE renkli/kalın özel isim, puan, galibiyet, üyelik bitişi; profil değişikliğinde yönetici onayı.
+- Normal üyeye **1 avatar**, VIP/ELITE'ye **avatar dahil 4 fotoğraf**; fotoğraflar yöneticinin onayından önce herkese açılmaz.
+- Yönetici rol/tier atama, süreli VIP/ELITE, manuel puan/galibiyet/haftalık puan yönetimi.
+- Yöneticinin yeni salon ekleme/silme, salon başına 1–200 masa belirleme; varsayılan 40 masa; VIP/ELITE üyeye süreli salon yöneticiliği verme; kiralık salon sahibi en fazla 40 masa kullanarak salonunu yeniden adlandırabilir.
+- Masa sahibinin oyun türü/oyuncu sayısı/el sayısı/başlangıç puanı/hamle süresi/izleyici/özel mesaj ayarlarını belirlemesi.
+- Oyun bazlı ayarlar: Kızma Birader 1 maç, Tavla 3/5 el, 101 Okey/Batak 1/3/5/7/9/11 el, Klasik/Eşli Okey 10/20/30 puan. Okey puanları ayarların açıklamasında 1/2/4/8 olarak gösterilir. **Bu kurallar henüz canlı oyun motorlarına bağlanmadığı için puan/hamleleri etkilemez.**
+- VIP/ELITE salon sohbeti yalnız yetkili üyelere görünür. Yönetici/moderatör duyuruları herkese görünür.
+- Masadaki oyuncu ve izin verilen izleyiciler için oyun alanının hemen altında **iki satır yüksekliğinde masa sohbeti**; geçmiş kaydırılabilir.
+- Masa içi özel mesajlaşma, kullanıcı profili gizlilik ayarı, masa sahibi engeli. Eşli Okey'de aynı takımdaki oyuncular için masa engeli istisnası; **kişisel mesaj alma yasağı daima korunur**.
+- Şikâyet bildirme, moderatör inceleme, yönetici/moderatör süreli hesap yasağı. Moderatör diğer moderatörleri/yöneticileri yasaklayamaz.
+- Turnuva oluşturma ve katılma; yönetici manuel maç sonuç onayı, doğrulamadan sonra VIP/ELITE ödülü; haftalık liderlik tablosu.
+- `data/club.json` ve `data/club-media/` altında kayıt; tek Node.js uygulamasında çalışma, yeni Redis/PostgreSQL bağımlılığı yok.
 
-**WordPress hesabı uzaklaştırmaları:** Eklenti, uzaklaştırılmış hesaplara yeni oyun sayfası bileti üretmez; ancak oyuna daha önce girmiş bir hesabın **aktif WebSocket oturumunu anında kesme/ban senkronizasyonu** henüz yapılmadı.
+## Şu an bilinçli olarak eksik bırakılanlar
 
-## Kurallar (bu sürümde kesin tanım)
+1. **Yeni salon masasındaki oyunlar oynanamaz.** Kızma Birader, Tavla, Batak, Okey vb. canlı motorlarını sonraki aşamada bu salona bağlayacağız. `/` adresindeki eski oyun motorları değiştirilmedi ve ayrı çalışır. Masada açıkça oyun motorunun bağlı olmadığı gösterilir.
+2. **Yeni Club üyeliği WordPress üyeliğinden bağımsızdır.** Var olan WordPress üyelerinin otomatik taşınması veya tek oturum bağlantısı henüz yok. WordPress hesabı/kayıtları silinmez.
+3. Para alma, otomatik salon kiralama ödemeleri, otomatik maç sonucu doğrulaması, gerçek oyun puanı dağıtımı, otomatik ödül doğrulaması **yoktur**. Turnuva sonuçlarını yönetici manuel doğrular; sonuç doğrulandıktan sonra üyelik ödülü gerçek veri kaydına işlenir.
+4. E-posta doğrulaması / otomatik şifre sıfırlama e-postası, anti-spam CAPTCHA, çoklu sunucu veri replikasyonu, otomatik veritabanı yedekleme henüz yoktur. Üretim ölçeğinde PostgreSQL'e geçiş önerilir.
+5. Veri depolaması tek işlem için **JSON tabanlıdır**. Kişisel veriler için **kalıcı volume + düzenli harici yedek** şarttır. Aynı volume'u birden fazla çalışan uygulamaya aynı anda yazdırma. Masa oturumları ve canlı masa sohbeti **sunucu yeniden başlatılınca sıfırlanır**. Salonlar, kullanıcılar, VIP bilgileri, moderasyon, turnuva ve duyurular korunur.
+6. Tam gerçek tarayıcı ve gerçek WebSocket uçtan uca testi bu ortamda yürütülemedi. Otomatik API/oyun testleri başarılı olsa da Coolify üzerinde farklı cihazlardan test etmeden üretime açık sayma.
 
-- **2 kişi:** Kırmızı ve Sarı; **4 kişi:** Kırmızı, Mavi, Sarı, Yeşil. Her renkte dört piyon.
-- Masa 52 ortak dış kare + her renkte 5 bitiş şeridi + merkez bitiş. Bir piyon `0…50` ilerleyince ortak yolda, `51…55` kendi renginin bitiş yolunda, `56` tam bitiştedir.
-- Başlangıç alanındaki piyon yalnızca **6** zar ile oyuna çıkar ve kendi renkteki başlangıç karesine yerleştirilir. Zar, Node.js sunucusunda `crypto.randomInt(1,7)` ile üretilir.
-- Normalde zar sayısı kadar ilerlenir, **tam sayı** ile 56'ya varılmalıdır; taşan hamle geçersizdir.
-- 6 atan ek zar hakkı kazanır; bir oyuncu aynı sırada **üçüncü kez art arda 6 atarsa** üçüncü 6 oynanmaz, sıra geçer.
-- Hiç oynanabilir piyon yoksa zar 6 değilse sıra geçer, 6 ise ek zar atılır.
-- Güvenli kareler global dış yol indeksleri **0, 8, 13, 21, 26, 34, 39, 47** (başlangıç ve yıldızlı kareler). Rakipler orada yenilmez. Diğer dış karelerde aynı kareye inince rakip piyonlar başlangıca döner. Aynı renk piyonlar üst üste gelebilir, **blokaj kuralı bu sürümde uygulanmaz**; rakip aynı karede birden çok piyona sahipse tamamı yenilir.
-- Sıra eylemi için masa oluştururken seçilen **15, 20, 30, 45, 60 veya 90 saniye** bulunur. Zaman aşımı turu doğrudan geçirir; rastgele piyon oynatılmaz.
-- Dört piyonunu bitiren kazanır. Oyuncu isteyerek masadan ayrılırsa elenir; diğerleri devam eder. Oyuncu bağlantısı aniden koparsa **5 dakika** koltuk ve oturum korunur, süre dolarsa elenir. Son kalan oyuncu da kazanır.
-- Maç başladığında başka biri katılamaz. Bitmiş maçlarda masa sahibi yeniden başlatabilir; başlamak için seçilmiş oyuncu sayısının eksiksiz olması gerekir.
+## Teknik ve güvenlik
 
-## Dosya özeti
+- Node.js 22+, `ws` bağımlılığı değişmedi.
+- Platform HTTP API `/api/club/*`, platform WS `/club/ws`; eski oyun WS `/` ve eski HTTP içerik yapısı aynı kaldı.
+- API CSRF başlığı `X-Club-CSRF`, origin doğrulaması, oturum cookie, giriş/kayıt hız sınırlama, sunucu tarafı rol ve chat izin kontrolleri.
+- Şifreler scrypt + benzersiz salt ile hash olarak saklanır. Kullanıcının oturum tokenı depoda SHA-256 hash halinde tutulur.
+- Resimler izin kontrolüyle API üzerinden servis edilir; yükleme boyutu 1 MB, tür JPG/PNG/WebP, onay öncesi herkese açık değil.
+- **Test:** `npm install && npm test` (mevcut 36 oyuna yönelik + 16 yeni toplam 52 test).
 
-**Yeni:** `ludo.js`, `ludo.test.js`, `arena-auth.js`, `arena-auth.test.js`, `public/ludo.css`.
+### Korunması gereken mevcut sistemler
 
-**Güncellenen:** `server.js`, `public/app.js`, `public/index.html`, `Dockerfile`, `package.json`, `README.md`.
-
-**Aynı kalan:** `mulk.js`, `mulk.test.js`, `tombala.js`, `tombala.test.js`, `tombala-prizes.test.js`, `scoring.js`, `scoring.test.js`, `public/style.css`, `.dockerignore`.
-
-## Test ve dürüst sınırlar
-
-- `npm test`: **36/36 test başarılı** (13 yeni Ludo/SSO testi + 23 önceki test).
-- `node --check server.js`, `node --check public/app.js`: başarılı.
-- PHP 8.2 sözdizimi: WordPress köprü dosyası başarılı.
-- Kızma Birader tahtası Chromium'da masaüstü ve 390 px mobil görünümde görüntülendi; 225 kare ve 16 piyon kontrol edildi; tarayıcı konsolunda hata yoktu.
-- **Tam WebSocket uçtan uca testi henüz yapılamadı:** test ortamında `npm install` internet erişimi nedeniyle zaman aşımına uğradı. Coolify, mevcut `ws` paketini kurarak çalıştıracaktır; iki kullanıcı ile canlı deneme yapılmalıdır.
-- Sıradaki aşama: PostgreSQL kalıcılığı, puan/galibiyet/turnuva entegrasyonu, aktif WebSocket yasaklama senkronizasyonu. Bunlar bu sürümde **çalışıyor gibi gösterilmez**. Redeploy veya süreç çökmesi **aktif odaları siler**.
-- Bu oyun için para, jeton veya maddi ödül sistemi yoktur.
+- `ludo.js`, `mulk.js`, `tombala.js`, `scoring.js`, testleri ve eski `public/app.js` aynen korunur.
+- Eski WordPress köprüsünün ortam değişkenleri (`ARENA_SSO_SECRET`, `ARENA_WP_ORIGIN`) silinmez.
+- Veritabanı sıfırlama veya sunucudan mevcut oyun dosyalarını silme işlemi yoktur.
