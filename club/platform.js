@@ -68,10 +68,13 @@ export function createClub({dataFile=process.env.ARENA_CLUB_DATA_PATH||path.reso
   const roomById=id=>db.rooms.find(r=>r.id===id);
   const tableKey=(roomId,no)=>`${roomId}:${no}`;
   const currentTable=(roomId,no)=>db.tables.find(t=>t.roomId===roomId&&t.no===no);
+  // Masa doluluğu ile gerçekten bağlı oyuncuları birbirinden ayır.
+  // WebSocket kısa süreli kesilirse, oturumla doğrulanmış HTTP yoklaması da kullanılabilir.
+  const isConnectedPlayer=p=>Boolean(p&&p.expires>now()&&(p.ws?.readyState===WebSocket.OPEN||(p.lastPulse||0)>now()-20000));
   const isBanned=u=>Boolean(u?.bannedUntil&&u.bannedUntil>now());
   const publicTournament=t=>({id:t.id,name:t.name,game:t.game,startAt:t.startAt,status:t.status,maxPlayers:t.maxPlayers,participants:t.participants.length,winnerName:t.winnerId?userById(t.winnerId)?.name:null,rewardTier:t.rewardTier||null,joined:t.participants});
   const publicRoom=r=>({id:r.id,name:r.name,game:r.game,tableCount:r.tableCount,rentalUntil:r.rentalUntil||null,ownerId:r.ownerId||null,online:[...presence.values()].filter(p=>p.roomId===r.id&&p.expires>now()).length});
-  function serializeTable(t,viewerId=null){const active=db.ludoGames[tableKey(t.roomId,t.no)];const members=[...presence.entries()].filter(([id,p])=>p.roomId===t.roomId&&p.tableNo===t.no&&p.expires>now()).map(([id,p])=>({user:publicUser(userById(id)),as:p.as}));return {...t,members,chat:(db.tableChats[tableKey(t.roomId,t.no)]||[]).slice(-50),gameReady:t.game==='ludo',ludo:active?{matchId:active.id,state:viewLudo(active.game,viewerId),result:active.result||null}:null};}
+  function serializeTable(t,viewerId=null){const active=db.ludoGames[tableKey(t.roomId,t.no)];const members=[...presence.entries()].filter(([id,p])=>p.roomId===t.roomId&&p.tableNo===t.no&&p.expires>now()).map(([id,p])=>({user:publicUser(userById(id)),as:p.as,connected:isConnectedPlayer(p)}));return {...t,members,chat:(db.tableChats[tableKey(t.roomId,t.no)]||[]).slice(-50),gameReady:t.game==='ludo',ludo:active?{matchId:active.id,state:viewLudo(active.game,viewerId),result:active.result||null}:null};}
   const tableSummary=(r)=>Array.from({length:r.tableCount},(_,i)=>{const no=i+1,t=currentTable(r.id,no);const members=t?[...presence.values()].filter(p=>p.roomId===r.id&&p.tableNo===no&&p.as==='player'&&p.expires>now()).length:0;return {no,ownerId:t?.ownerId||null,game:t?.game||r.game,players:members,max:t?.maxPlayers||4,locked:t?.spectators===false,playing:!!(t&&db.ludoGames[tableKey(r.id,no)]&&!db.ludoGames[tableKey(r.id,no)].game.finished)};});
   function self(u){return {...publicUser(u),email:u.email,banUntil:u.bannedUntil||null,csrf:''};}
   function getSession(req){const token=cookie(req,'arena_club_session');if(!token)return null;const s=db.sessions.find(x=>x.hash===digest(token)&&x.expires>now());if(!s)return null;const u=userById(s.userId);return u&&!isBanned(u)?{u,s}:null;}
@@ -90,7 +93,7 @@ export function createClub({dataFile=process.env.ARENA_CLUB_DATA_PATH||path.reso
   function prune(){for(const [id,p] of presence){if(p.expires<=now()){presence.delete(id);if(p.tableNo)syncTable(p.roomId,p.tableNo);syncRoom(p.roomId);}}}
   function ludoEntry(roomId,no){return db.ludoGames[tableKey(roomId,no)];}
   function liveLudoUsers(entry){return entry.game.players.filter(p=>{
-    const q=presence.get(p.token);return q?.roomId===entry.roomId&&q.tableNo===entry.no&&q.as==='player'&&q.expires>now()&&q.ws?.readyState===WebSocket.OPEN;
+    const q=presence.get(p.token);return q?.roomId===entry.roomId&&q.tableNo===entry.no&&q.as==='player'&&isConnectedPlayer(q);
   });}
   function recordLudoWin(entry){
     if(!entry.game.finished||entry.settled)return;
@@ -228,14 +231,14 @@ export function createClub({dataFile=process.env.ARENA_CLUB_DATA_PATH||path.reso
       if(route==='/room/enter'&&method==='POST'){
         const r=roomById(d.roomId);if(!r)throw HttpError('Salon bulunamadı.',404);
         const p=presence.get(u.id);if(p?.tableNo){const oldNo=p.tableNo;p.tableNo=null;p.as=null;syncTable(p.roomId,oldNo);}
-        presence.set(u.id,{roomId:r.id,tableNo:null,as:null,expires:now()+45000,ws:[...connections].find(([,id])=>id===u.id)?.[0]||null});syncRoom(r.id);respond(res,200,{room:publicRoom(r),tables:tableSummary(r),announcements:db.announcements.slice(-15),vipChat:isPremium(u)?db.vipChat.filter(m=>m.roomId===r.id).slice(-35):[],users:liveUsers(r.id)});return true;
+        presence.set(u.id,{roomId:r.id,tableNo:null,as:null,expires:now()+45000,lastPulse:now(),ws:[...connections].find(([,id])=>id===u.id)?.[0]||null});syncRoom(r.id);respond(res,200,{room:publicRoom(r),tables:tableSummary(r),announcements:db.announcements.slice(-15),vipChat:isPremium(u)?db.vipChat.filter(m=>m.roomId===r.id).slice(-35):[],users:liveUsers(r.id)});return true;
       }
       if(route==='/room/leave'&&method==='POST'){
         const p=presence.get(u.id);if(p){presence.delete(u.id);syncRoom(p.roomId);if(p.tableNo)syncTable(p.roomId,p.tableNo);};respond(res,200,{ok:true});return true;
       }
       if(route==='/table/join'&&method==='POST'){
         const r=roomById(d.roomId),no=Number(d.no);tableAccess(u,r);strictLimit(no,1,r.tableCount,'Masa');const current=presence.get(u.id);
-        if(current?.tableNo){const oldNo=current.tableNo,oldRoom=current.roomId;presence.set(u.id,{roomId:oldRoom,expires:now()+45000});syncTable(oldRoom,oldNo);syncRoom(oldRoom);}
+        if(current?.tableNo){const oldNo=current.tableNo,oldRoom=current.roomId;presence.set(u.id,{roomId:oldRoom,expires:now()+45000,lastPulse:now(),ws:current.ws||null});syncTable(oldRoom,oldNo);syncRoom(oldRoom);}
         let t=currentTable(r.id,no);if(!t){if(d.as==='spectator')throw HttpError('Henüz kurulmamış masayı izleyemezsiniz.');t=tableInit(u,r.id,no,d.settings||{});}
         const as=d.as==='spectator'?'spectator':'player';if(as==='spectator'&&!t.spectators)throw HttpError('Masa sahibi izleyici girişini kapatmış.');
         const inProgress=ludoEntry(r.id,no);
@@ -245,13 +248,26 @@ export function createClub({dataFile=process.env.ARENA_CLUB_DATA_PATH||path.reso
           const count=[...presence.entries()].filter(([id,p])=>id!==u.id&&p.roomId===r.id&&p.tableNo===no&&p.as==='player'&&p.expires>now()).length;
           if(count>=t.maxPlayers)throw HttpError('Masa dolu.');
         }
-        presence.set(u.id,{roomId:r.id,tableNo:no,as,expires:now()+45000,ws:[...connections].find(([,id])=>id===u.id)?.[0]||null});
+        presence.set(u.id,{roomId:r.id,tableNo:no,as,expires:now()+45000,lastPulse:now(),ws:[...connections].find(([,id])=>id===u.id)?.[0]||null});
         // A reconnecting player takes back their seat from the bot.
         if(inProgress&&!inProgress.game.finished&&as==='player'){const p=inProgress.game.players.find(p=>p.token===u.id);if(p){p.bot=false;p.botReason=null;p.disconnectedAt=null;save();}}
         syncTable(r.id,no);syncRoom(r.id);respond(res,200,{table:serializeTable(t,u.id)});return true;
       }
+      if(route==='/table/state'&&method==='GET'){
+        const roomId=url.searchParams.get('roomId'),no=Number(url.searchParams.get('no'));
+        const t=currentTable(roomId,no);if(!t)throw HttpError('Masa bulunamadı.',404);
+        requireInTable(u,roomId,no);respond(res,200,{table:serializeTable(t,u.id)});return true;
+      }
+      if(route==='/table/pulse'&&method==='POST'){
+        const no=Number(d.no),t=currentTable(d.roomId,no);
+        if(!t)throw HttpError('Masa bulunamadı.',404);
+        const p=requireInTable(u,t.roomId,no),wasOnline=isConnectedPlayer(p);
+        p.expires=now()+45000;p.lastPulse=now();
+        if(!wasOnline){syncTable(t.roomId,no);syncRoom(t.roomId);}
+        respond(res,200,{table:serializeTable(t,u.id)});return true;
+      }
       if(route==='/table/leave'&&method==='POST'){
-        const p=presence.get(u.id);if(!p?.tableNo)throw HttpError('Masada değilsiniz.');const roomId=p.roomId,no=p.tableNo;presence.set(u.id,{...p,tableNo:null,as:null,expires:now()+45000});
+        const p=presence.get(u.id);if(!p?.tableNo)throw HttpError('Masada değilsiniz.');const roomId=p.roomId,no=p.tableNo;presence.set(u.id,{...p,tableNo:null,as:null,expires:now()+45000,lastPulse:now()});
         const t=currentTable(roomId,no);const seatIds=[...presence.entries()].filter(([id,q])=>q.roomId===roomId&&q.tableNo===no&&q.as==='player'&&q.expires>now()).map(([id])=>id);const others=[...presence.values()].some(q=>q.roomId===roomId&&q.tableNo===no&&q.expires>now());if(t&&t.ownerId===u.id&&seatIds.length){t.ownerId=seatIds[0];save();}if(t&&!seatIds.length&&!ludoEntry(roomId,no)){ for(const [id,q] of presence)if(q.roomId===roomId&&q.tableNo===no){presence.set(id,{roomId,tableNo:null,as:null,expires:now()+45000});for(const [ws,connectedId] of connections)if(connectedId===id)send(ws,{type:'table_closed',roomId,no});}db.tables=db.tables.filter(x=>x!==t);delete db.tableChats[tableKey(roomId,no)];save();}
         syncTable(roomId,no);syncRoom(roomId);respond(res,200,{ok:true});return true;
       }
@@ -270,8 +286,11 @@ export function createClub({dataFile=process.env.ARENA_CLUB_DATA_PATH||path.reso
         if(t.ownerId!==u.id&&u.role!=='admin')throw HttpError('Maçı yalnız masa sahibi başlatabilir.',403);
         const previous=ludoEntry(r.id,no);
         if(previous&&!previous.game.finished)throw HttpError('Bu masada zaten aktif maç var.',409);
-        const ids=[...presence.entries()].filter(([id,p])=>p.roomId===r.id&&p.tableNo===no&&p.as==='player'&&p.expires>now()&&p.ws?.readyState===WebSocket.OPEN).map(([id])=>id);
-        if(ids.length!==t.maxPlayers||![2,4].includes(ids.length))throw HttpError(`Maçı başlatmak için tam ${t.maxPlayers} çevrimiçi oyuncu gerekli.`,409);
+        const seated=[...presence.entries()].filter(([id,p])=>p.roomId===r.id&&p.tableNo===no&&p.as==='player'&&p.expires>now());
+        const ready=seated.filter(([,p])=>isConnectedPlayer(p));
+        if(seated.length!==t.maxPlayers||![2,4].includes(t.maxPlayers))throw HttpError(`Maçı başlatmak için ${t.maxPlayers} ayrı oyuncunun masaya oturması gerekiyor (şu an ${seated.length}).`,409);
+        if(ready.length!==seated.length)throw HttpError(`Masada ${seated.length} oyuncu var ancak ${ready.length} oyuncunun bağlantısı doğrulandı. Diğer oyuncu oyun sekmesini açıp birkaç saniye beklesin.`,409);
+        const ids=ready.map(([id])=>id);
         const seats=ids.map(id=>{const member=userById(id);return {token:id,name:member.name,avatar:member.avatarId?`/api/club/media/${member.avatarId}`:''};});
         const g=startLudo(seats,{turnSeconds:t.turnSeconds});
         db.ludoGames[tableKey(r.id,no)]={id:ident(),roomId:r.id,no,game:g,createdAt:now(),settled:false};
@@ -415,13 +434,13 @@ export function createClub({dataFile=process.env.ARENA_CLUB_DATA_PATH||path.reso
   }
   wss.on('connection',(ws,req)=>{
     const s=getSession(req);if(!s){ws.close(1008,'Login required');return;}
-    const id=s.u.id;connections.set(ws,id);const p=presence.get(id);if(p){p.expires=now()+45000;p.ws=ws;syncRoom(p.roomId);if(p.tableNo)syncTable(p.roomId,p.tableNo);}
+    const id=s.u.id;connections.set(ws,id);const p=presence.get(id);if(p){p.expires=now()+45000;p.lastPulse=now();p.ws=ws;syncRoom(p.roomId);if(p.tableNo)syncTable(p.roomId,p.tableNo);}
     send(ws,{type:'ready',user:publicUser(s.u)});
     ws.on('message',data=>{let packet;try{packet=JSON.parse(data.toString());}catch{return;}if(packet.type==='ping'){
-      const p=presence.get(id);if(p){p.expires=now()+45000;p.ws=ws;}
+      const p=presence.get(id);if(p){p.expires=now()+45000;p.lastPulse=now();p.ws=ws;}
       send(ws,{type:'pong'});
     }});
-    ws.on('close',()=>{connections.delete(ws);const p=presence.get(id);if(p&&p.ws===ws){p.ws=null;p.expires=now()+30000;}});
+    ws.on('close',()=>{connections.delete(ws);const p=presence.get(id);if(p&&p.ws===ws){p.ws=null;p.expires=Math.max(p.expires||0,now()+30000);if(p.tableNo)syncTable(p.roomId,p.tableNo);syncRoom(p.roomId);}});
   });
   return {handle,wss,db,getSession,close(){clearInterval(timer);wss.close();},games};
 }
