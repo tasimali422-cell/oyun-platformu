@@ -95,7 +95,7 @@ export function createClub({dataFile=process.env.ARENA_CLUB_DATA_PATH||path.reso
   }
   function tableInit(u,roomId,no,settings={}){
     const r=roomById(roomId);tableAccess(u,r);strictLimit(no,1,r.tableCount,'Masa numarası');let t=currentTable(roomId,no);
-    if(!t){const game=String(settings.game||r.game);const config=validateSettings(game,settings);t={roomId,no,ownerId:u.id,game,...config,created:now()};db.tables.push(t);audit(u,'table_create',`${r.name} #${no} ${game}`);save();}
+    if(!t){const game=r.game;if(settings.game&&settings.game!==r.game)throw HttpError('Bu salonun masalarında yalnızca salonun oyunu oynanabilir.',409);const config=validateSettings(game,settings);t={roomId,no,ownerId:u.id,game,...config,created:now()};db.tables.push(t);audit(u,'table_create',`${r.name} #${no} ${game}`);save();}
     return t;
   }
   function canMessage(a,b,roomId,no){const p=presence.get(a.id),q=presence.get(b.id);const t=currentTable(roomId,no);if(!t||!p||!q||p.tableNo!==no||q.tableNo!==no||p.roomId!==roomId||q.roomId!==roomId)return false;
@@ -122,7 +122,7 @@ export function createClub({dataFile=process.env.ARENA_CLUB_DATA_PATH||path.reso
       if(route.startsWith('/media/')&&method==='GET'){fileResponse(req,res,route.split('/').pop());return true;}
       if(route==='/tournaments'&&method==='GET'){respond(res,200,{tournaments:db.tournaments.map(publicTournament)});return true;}
       if(route==='/leaderboard'&&method==='GET'){respond(res,200,{players:db.users.slice().sort((a,b)=>(b.weeklyPoints||0)-(a.weeklyPoints||0)).slice(0,25).map(publicUser)});return true;}
-      if(route==='/config'&&method==='GET'){return respond(res,200,{games,configured:db.users.some(u=>u.role==='admin'),version:'2.0.0'}),true;}
+      if(route==='/config'&&method==='GET'){return respond(res,200,{games,configured:db.users.some(u=>u.role==='admin'),version:'2.1.0'}),true;}
       if(route==='/register'&&method==='POST'){
         const ip=String(req.headers['x-forwarded-for']||req.socket.remoteAddress||'').split(',')[0].slice(0,64);
         const key=`reg:${ip}`;const row=rate.get(key)||{count:0,start:now()};if(now()-row.start>3600000){row.count=0;row.start=now();}if(++row.count>12)throw HttpError('Çok sayıda kayıt denemesi. Daha sonra yeniden deneyin.',429);rate.set(key,row);
@@ -169,7 +169,7 @@ export function createClub({dataFile=process.env.ARENA_CLUB_DATA_PATH||path.reso
         const id=ident();fs.writeFileSync(path.join(mediaDir,id),bytes,{flag:'wx',mode:0o600});const a={id:ident(),type:'photo',userId:u.id,payload:{photoId:id,replaceId:replace||null,avatar:d.avatar===true||!u.avatarId},status:'pending',created:now()};db.approvals.push(a);save();respond(res,201,{ok:true,approval:a.id});return true;
       }
       if(route==='/approvals/mine'&&method==='GET'){respond(res,200,{approvals:db.approvals.filter(a=>a.userId===u.id).slice(-30)});return true;}
-      if(route==='/rooms'&&method==='GET'){respond(res,200,{rooms:db.rooms.map(publicRoom)});return true;}
+      if(route==='/rooms'&&method==='GET'){const game=url.searchParams.get('game');if(game&&!games[game])throw HttpError('Oyun türü bulunamadı.',400);respond(res,200,{rooms:db.rooms.filter(r=>!game||r.game===game).map(publicRoom)});return true;}
       if(route==='/tournament/join'&&method==='POST'){
         const t=db.tournaments.find(x=>x.id===d.id);if(!t||t.status!=='open')throw HttpError('Bu turnuvaya artık katılamazsın.',409);
         if(t.participants.includes(u.id))throw HttpError('Turnuvaya zaten kayıtlısın.',409);
@@ -203,7 +203,7 @@ export function createClub({dataFile=process.env.ARENA_CLUB_DATA_PATH||path.reso
       if(route==='/table/settings'&&method==='PATCH'){
         const t=currentTable(d.roomId,Number(d.no));if(!t)throw HttpError('Masa bulunamadı.',404);
         if(t.ownerId!==u.id&&u.role!=='admin')throw HttpError('Yalnız masa sahibi kuralları düzenleyebilir.',403);
-        const updated=validateSettings(t.game,{...t,...d.settings});const playerCount=[...presence.values()].filter(p=>p.roomId===t.roomId&&p.tableNo===t.no&&p.as==='player'&&p.expires>now()).length;
+        if(d.settings?.game&&d.settings.game!==t.game)throw HttpError('Bu masanın oyun türü salonla aynıdır; değiştirilemez.',409);const updated=validateSettings(t.game,{...t,...d.settings});const playerCount=[...presence.values()].filter(p=>p.roomId===t.roomId&&p.tableNo===t.no&&p.as==='player'&&p.expires>now()).length;
         if(playerCount>updated.maxPlayers)throw HttpError('Oyuncu sayısının altında kapasite seçilemez.');Object.assign(t,updated);
         if(!t.spectators){for(const [id,p] of presence)if(p.roomId===t.roomId&&p.tableNo===t.no&&p.as==='spectator')presence.set(id,{roomId:t.roomId,expires:now()+45000});}
         save();syncRoom(t.roomId);syncTable(t.roomId,t.no);respond(res,200,{table:serializeTable(t)});return true;
@@ -275,6 +275,15 @@ export function createClub({dataFile=process.env.ARENA_CLUB_DATA_PATH||path.reso
         const rewardDays=Number(d.rewardDays||30);if(![7,14,30,60,90].includes(rewardDays))throw HttpError('Ödül süresi geçersiz.');
         const t={id:ident(),name,game,startAt,status:'open',maxPlayers,participants:[],winnerId:null,rewardTier,rewardDays,created:now()};
         db.tournaments.push(t);audit(u,'tournament_create',name);save();respond(res,201,{tournament:publicTournament(t)});return true;
+      }
+      if(route==='/admin/tournament/enroll'&&method==='POST'){
+        requireAdmin(u);const t=db.tournaments.find(t=>t.id===d.id);
+        if(!t||t.status!=='open')throw HttpError('Kayıt yapılamayan turnuva.',409);
+        const member=userById(d.userId);if(!member||isBanned(member))throw HttpError('Katılımcı bulunamadı veya yasaklı.',404);
+        if(t.participants.includes(member.id))throw HttpError('Üye zaten turnuvaya kayıtlı.',409);
+        if(t.participants.length>=t.maxPlayers)throw HttpError('Turnuva kontenjanı dolu.',409);
+        t.participants.push(member.id);audit(u,'tournament_enroll',`${t.name} → ${member.username} yönetici kaydı`);save();
+        respond(res,200,{tournament:publicTournament(t)});return true;
       }
       if(route==='/admin/tournament/result'&&method==='POST'){
         requireAdmin(u);const t=db.tournaments.find(t=>t.id===d.id);if(!t||t.status==='finished')throw HttpError('Turnuva bulunamadı veya zaten sonuçlandı.',404);

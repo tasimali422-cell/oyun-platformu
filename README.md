@@ -1,6 +1,6 @@
-# Arena Club v2.0 — Üyelik, Salonlar, Sohbet ve Yönetim Scripti
+# Arena Club v2.1 — Salon Filtreleri, Yetki ve Turnuva Düzeltmeleri
 
-Bu, `oyun-platformu` v1.5 Kızma Birader ZIP'i baz alınarak hazırlanmış **tam kaynak kodu paketidir**. Mevcut oyun motorları (`ludo.js`, `mulk.js`, `tombala.js`, `scoring.js`, `public/app.js`) değiştirilmedi. Eski oyun uygulaması `/` adresinde çalışmaya devam eder, yeni Arena Club platformu `/club` adresindedir.
+Bu, Arena Club v2.0 üzerine hazırlanan **mevcut kayıtları koruyan güncellemedir**. GitHub'daki v2.0 ile aynı klasör yapısını kullanır. Mevcut oyun motorları (`ludo.js`, `mulk.js`, `tombala.js`, `scoring.js`, `public/app.js`) değiştirilmedi. Eski oyun uygulaması `/` adresinde çalışmaya devam eder, yeni Arena Club platformu `/club` adresindedir.
 
 ## Kurulum — daha önce Node.js kullanmamış kullanıcı için
 
@@ -40,7 +40,7 @@ Dockerfile              → club klasörünü kopyalıyor, /app/data klasörün�
 - Normal üyeye **1 avatar**, VIP/ELITE'ye **avatar dahil 4 fotoğraf**; fotoğraflar yöneticinin onayından önce herkese açılmaz.
 - Yönetici rol/tier atama, süreli VIP/ELITE, manuel puan/galibiyet/haftalık puan yönetimi.
 - Yöneticinin yeni salon ekleme/silme, salon başına 1–200 masa belirleme; varsayılan 40 masa; VIP/ELITE üyeye süreli salon yöneticiliği verme; kiralık salon sahibi en fazla 40 masa kullanarak salonunu yeniden adlandırabilir.
-- Masa sahibinin oyun türü/oyuncu sayısı/el sayısı/başlangıç puanı/hamle süresi/izleyici/özel mesaj ayarlarını belirlemesi.
+- Masa sahibinin salona ait oyunun oyuncu sayısı/el sayısı/başlangıç puanı/hamle süresi/izleyici/özel mesaj ayarlarını belirlemesi.
 - Oyun bazlı ayarlar: Kızma Birader 1 maç, Tavla 3/5 el, 101 Okey/Batak 1/3/5/7/9/11 el, Klasik/Eşli Okey 10/20/30 puan. Okey puanları ayarların açıklamasında 1/2/4/8 olarak gösterilir. **Bu kurallar henüz canlı oyun motorlarına bağlanmadığı için puan/hamleleri etkilemez.**
 - VIP/ELITE salon sohbeti yalnız yetkili üyelere görünür. Yönetici/moderatör duyuruları herkese görünür.
 - Masadaki oyuncu ve izin verilen izleyiciler için oyun alanının hemen altında **iki satır yüksekliğinde masa sohbeti**; geçmiş kaydırılabilir.
@@ -72,3 +72,17 @@ Dockerfile              → club klasörünü kopyalıyor, /app/data klasörün�
 - `ludo.js`, `mulk.js`, `tombala.js`, `scoring.js`, testleri ve eski `public/app.js` aynen korunur.
 - Eski WordPress köprüsünün ortam değişkenleri (`ARENA_SSO_SECRET`, `ARENA_WP_ORIGIN`) silinmez.
 - Veritabanı sıfırlama veya sunucudan mevcut oyun dosyalarını silme işlemi yoktur.
+
+
+## v2.1 düzeltmeleri (31 Ekim 2026)
+
+- Ana sayfa artık ayrı **oyun kartları** gösteriyor. Oyun kartından girildiğinde yalnızca o oyuna ait salonlar listelenir. Salonlar üst menüsü önce oyun kategorisi seçtirir. Kızma Birader, Klasik Okey, 101 Okey, Eşli Okey, Tavla, Batak, Tombala, Mülk Turu ayrıdır.
+- Yeni masa kurulurken oyun türü salona sabittir. Sunucu, farklı oyun türü ile masa oluşturma veya var olan masanın oyun türünü değiştirme isteğini reddeder.
+- Önceki sürümde boş kalan **Turnuvalar** sayfası yönlendirmesi tamamlandı. İleri tarihli açık turnuvalar ana sayfanın **Yaklaşan Etkinlikler** bölümünde de görüntülenir. Tarayıcının yerel saat seçimi API'ye ISO-8601 şeklinde gönderilir.
+- Yönetim → Üyeler ekranına **Rol / Yetki ver** düğmesi eklendi; Normal Oyuncu, Moderatör ve Yönetici seçenekleri ayrı bir pencerede. VIP/ELITE üyelik ve puanlar için ayrı düğme var.
+- Yönetim → Turnuvalar ekranında **Katılımcılar** düğmesiyle kayıtlı üyeler listelenebilir ve yönetici aktif turnuvaya kullanıcı ekleyebilir. **Sonucu doğrula** yalnız kayıtlı katılımcılar arasından kazanan seçtirir; kayıtlı kimse yoksa açıklayıcı uyarı çıkar.
+- Turnuva sonuçları hâlâ otomatik doğrulanmıyor; ödül ancak yönetici doğru kazananı bizzat kontrol edip onaylarsa işlenir. Sırf üyelik denemek için yönetim panelinin VIP/ELITE yetkilendirme alanını kullan.
+- Mevcut **data/club.json** şeması değiştirilmedi; eski kullanıcı, salon, turnuva ve üyelik kayıtlarını silen veya sıfırlayan bir kod yok. **Mevcut volume'u silmeyin, yeniden oluşturmayın.**
+- Eski `ludo.js`, `mulk.js`, `tombala.js`, `scoring.js`, `public/app.js` dosyaları ve diğer eski oyun motorları değiştirilmedi.
+
+**Test notu:** 55 otomatik test (HTTP Arena Club API testleri için test ortamındaki geçici WebSocket yerine koyucu dahil), ayrıca arayüzün HTML üretim kontrolleri geçti. Paket, test amaçlı `node_modules/ws` yerine koyucusunu içermez; Coolify normal `ws` bağımlılığını `npm install` ile kurar. Bu ortamda gerçek tarayıcıya bağlantı güvenlik kısıtı nedeniyle bloklandı ve gerçek WebSocket/çok oyunculu test yapılmadı. Coolify'da ayrıca kontrol et.

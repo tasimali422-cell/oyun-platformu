@@ -72,11 +72,47 @@ test('admin rooms create/update and user room join',async()=>{
   const rooms=await call('/rooms','GET',null,member);assert.equal(rooms.body.rooms.length,2);
   const out=await call('/room/enter','POST',{roomId},member);assert.equal(out.status,200);assert.equal(out.body.tables.length,40);
 });
-test('table games enforce allowed rounds, seats and ownership',async()=>{
-  let x=await call('/table/join','POST',{roomId,no:1,as:'player',settings:{game:'tavla',rounds:7,maxPlayers:2}},member);assert.equal(x.status,400);
-  x=await call('/table/join','POST',{roomId,no:1,as:'player',settings:{game:'tavla',rounds:3,maxPlayers:2}},member);assert.equal(x.status,200,JSON.stringify(x.body));table=x.body.table;assert.equal(table.rounds,3);
+test('table rules prevent mixing different games in one salon',async()=>{
+  let x=await call('/table/join','POST',{roomId,no:1,as:'player',settings:{game:'tavla',rounds:3,maxPlayers:2}},member);assert.equal(x.status,409);
+  x=await call('/table/join','POST',{roomId,no:1,as:'player',settings:{game:'ludo',rounds:7,maxPlayers:4}},member);assert.equal(x.status,400);
+  x=await call('/table/join','POST',{roomId,no:1,as:'player',settings:{game:'ludo',rounds:1,maxPlayers:4}},member);assert.equal(x.status,200,JSON.stringify(x.body));table=x.body.table;assert.equal(table.game,'ludo');
+  assert.equal((await call('/table/settings','PATCH',{roomId,no:1,settings:{game:'tavla'}},member)).status,409);
   assert.equal((await call('/table/settings','PATCH',{roomId,no:1,settings:{turnSeconds:15}},vip)).status,403);
 });
+
+test('game-filtered room endpoint separates Ludo and Okey salons',async()=>{
+  const all=await call('/rooms','GET',null,member);
+  const ludo=await call('/rooms?game=ludo','GET',null,member);
+  const okey=await call('/rooms?game=okey','GET',null,member);
+  assert.ok(all.body.rooms.length>=2);
+  assert.ok(ludo.body.rooms.length>=1 && ludo.body.rooms.every(r=>r.game==='ludo'));
+  assert.ok(okey.body.rooms.length>=1 && okey.body.rooms.every(r=>r.game==='okey'));
+  assert.equal((await call('/rooms?game=invalid','GET',null,member)).status,400);
+});
+
+test('administrator can promote another member to admin and demote back',async()=>{
+  const promoted=await call('/admin/user','PATCH',{id:guest.id,role:'admin'},admin);
+  assert.equal(promoted.status,200);assert.equal(promoted.body.user.role,'admin');
+  assert.equal((await call('/admin/summary','GET',null,guest)).status,200);
+  const demote=await call('/admin/user','PATCH',{id:guest.id,role:'member'},admin);
+  assert.equal(demote.status,200);assert.equal(demote.body.user.role,'member');
+  assert.equal((await call('/admin/summary','GET',null,guest)).status,403);
+});
+
+test('admin can enroll an existing user in a future tournament without granting an unverified prize',async()=>{
+  const created=await call('/admin/tournament','POST',{name:'Gelecek Cumartesi Ludo',game:'ludo',startAt:new Date(Date.now()+7*86400000).toISOString(),maxPlayers:4,rewardTier:'vip',rewardDays:7},admin);
+  assert.equal(created.status,201);
+  const t=created.body.tournament;
+  assert.ok((await call('/tournaments')).body.tournaments.some(x=>x.id===t.id));
+  assert.equal((await call('/admin/tournament/enroll','POST',{id:t.id,userId:vip.id},member)).status,403);
+  assert.equal((await call('/admin/tournament/enroll','POST',{id:t.id,userId:vip.id},admin)).status,200);
+  assert.equal((await call('/admin/tournament/enroll','POST',{id:t.id,userId:vip.id},admin)).status,409);
+  const summary=await call('/admin/summary','GET',null,admin);
+  const entry=summary.body.tournaments.find(x=>x.id===t.id);
+  assert.equal(entry.participants,1);assert.ok(entry.joined.includes(vip.id));
+  assert.equal(entry.status,'open'); // no fake result / reward
+});
+
 test('VIP-only salon chat and moderator public announcement',async()=>{
   await call('/room/enter','POST',{roomId},vip);
   await call('/room/enter','POST',{roomId},moderator);

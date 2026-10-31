@@ -1,41 +1,40 @@
-ARENA CLUB V2.0 — KOLAY KURULUM
+ARENA CLUB V2.1 – MEVCUT V2.0 ÜZERİNE GÜNCELLEME
+================================================
 
-ÖNCE: GitHub ve Coolify yedeğini al. ZIP'i bilgisayarda aç.
+ÖNCE:
+- Çalışan oyuna.top/club sistemini veya kullanıcı kayıtlarını silme.
+- Coolify Persistent Storage içindeki /app/data volume'unu DEĞİŞTİRME.
+- Veritabanı ve dosya volume'u ile GitHub deposunun yedeğini al.
+- Mümkünse önce başka bir Coolify test uygulamasına dağıt.
 
-1) GitHub: tasimali422-cell/oyun-platformu > Add file > Upload files
-   ZIP'in kendisini DEĞİL içindeki bütün dosya ve klasörleri deponun ANA DİZİNİNE yükle.
-   server.js ve package.json deponun ana dizininde olmalı; club ve public klasörleri de görünmeli.
-   Commit changes düğmesine bas.
+GITHUB'A YÜKLE:
+1. GÜNCELLEME ZIP'ini bilgisayarında aç.
+2. ZIP içindeki club ve public klasörlerini GitHub'daki
+   tasimali422-cell/oyun-platformu deposunun ANA dizinine yükle.
+   Dizinler aynı kalmalı: club/platform.js ve public/club.js gibi.
+3. GitHub mevcut dosyalar için güncelleme yapacak. Commit changes de.
+4. İstersen bunun yerine TAM v2.1 ZIP'ini çıkarıp tüm projeyi
+   depoya yükleyebilirsin; dosyaların yerlerini değiştirme.
 
-2) Coolify: Oyun Platformu > production > oyun-platformu-web > Environment Variables
-   + Add > Name: ARENA_CLUB_ADMIN_EMAIL
-           Value: [sana ait e-posta adresin]
-   + Add > Name: ARENA_CLUB_ADMIN_PASSWORD
-           Value: [en az 12 karakterli kendine özel kuvvetli şifre]
-   Runtime açık olsun. Şifreyi ekran görüntüsünde paylaşma.
-   Mevcut ARENA_SSO_SECRET / ARENA_WP_ORIGIN ayarlarına DOKUNMA.
+COOLIFY:
+5. Mevcut oyun-platformu-web uygulamasına gir.
+6. Environment Variables ve Persistent Storage ayarlarını AYNEN koru.
+7. Sağ üstten Redeploy yap, durum Running olunca /health adresini kontrol et.
+8. Ardından https://oyuna.top/club adresini açıp Ctrl+F5 ile yenile.
 
-3) Coolify: oyun-platformu-web > Configuration > Persistent Storage
-   Add > Volume Mount
-   Name: arena-club-data
-   Destination Path: /app/data
-   Add / Save
-   ÖNEMLİ: Kayıtlar ve fotoğraflar bu kalıcı klasöre yazılır; bu adımı atlama!
+NE TEST EDECEKSİN:
+A. Ana sayfada Kızma Birader kartı -> sadece Kızma Birader salonları;
+   Klasik Okey kartı -> sadece Okey salonları.
+B. Yönetim -> Üyeler -> Rol / Yetki ver -> Moderatör seç -> Kaydet.
+   İstersen Yönetici seçeneğini de test et; tam yetki verir, dikkatli ol.
+C. Yönetim -> Turnuvalar -> ileri tarihli turnuva oluştur.
+   Ana sayfa Yaklaşan Etkinlikler ve Turnuvalar menüsünde görünmeli.
+D. Yönetim -> Turnuvalar -> Katılımcılar -> oyuncu ekle.
+   Ardından Sonucu doğrula penceresinde yalnız katılımcılar görünür.
+   GERÇEK maç doğrulaması olmadan ödül verme.
 
-4) Coolify: Redeploy. 'Running' durumuna dönmeli.
-
-5) TARAYICIDA: https://oyuna.top/club
-   Sağ üstten Giriş Yap > yukarıda belirlediğin e-posta + şifre.
-   Yönetim menüsü açılmalı. Ana sayfada varsayılan Kızma Birader salonu 40 masadır.
-
-6) Bir başka tarayıcıdan Üye Ol, normal üye oluştur.
-   Salonlar > salona gir > boş masa seç > oyun türü ve kurallarını seç.
-   Masayı aç > sohbeti ve ayarları dene.
-
-7) Yönetim: Kullanıcıya VIP / ELITE ver, salonu kirala, profil ve fotoğraf onayını dene.
-
-UYARI: Yeni salon masasındaki OYUN MOTORLARI BU SÜRÜMDE BAĞLI DEĞİLDİR.
-Önceki oyunlar: https://oyuna.top/
-Yeni sosyal platform: https://oyuna.top/club
-
-GitHub/Coolify adımları ve teknik detaylar README.md içinde.
+NOT:
+Bu güncelleme YENİ bir WordPress eklentisi değildir.
+Mevcut Node.js/Coolify Arena Club uygulamasına yönelik kaynak koddur.
+Eski oyun motorları, yeni üye sistemi ve canlı kayıtların tutulduğu
+/app/data dizini korunur.
