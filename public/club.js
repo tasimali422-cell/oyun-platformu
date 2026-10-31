@@ -145,7 +145,7 @@ async function act(el){const name=el.dataset.act,id=el.dataset.id,no=Number(el.d
  }}
 function renderDm(){if(!state.dmTo)return;$('#dmBox')?.remove();document.body.insertAdjacentHTML('beforeend',dmPanel());const lines=$('#dmLines');if(lines)lines.scrollTop=lines.scrollHeight;}
 async function compressImage(file){if(!file||!/^image\/(png|jpeg|webp)$/.test(file.type))throw Error('PNG, JPEG veya WebP seç.');if(file.size>10*1024*1024)throw Error('Orijinal resim 10 MB üstünde olamaz.');const img=await createImageBitmap(file);const canvas=document.createElement('canvas'),ratio=Math.min(1,950/Math.max(img.width,img.height));canvas.width=Math.round(img.width*ratio);canvas.height=Math.round(img.height*ratio);canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);const out=canvas.toDataURL('image/jpeg',.79);img.close();if(out.length>1300000)throw Error('Resim çok büyük, daha küçük bir görsel seç.');return out;}
-async function submit(form){const id=form.id,d=formData(form);switch(id){
+async function submit(form){const id=form.getAttribute('id'),d=formData(form);switch(id){
  case 'authForm':{const p=await api(d.mode==='register'?'/register':'/login','POST',{...d});state.me=p.user;state.csrf=p.csrf;closeOverlay();await loadMe();notice('Arena Club hesabına hoş geldin!');break;}
  case 'profileForm':await api('/profile','POST',d);notice('Değişiklik yönetici onayına gönderildi.');loadApprovals();break;
  case 'photoForm':{const f=form.elements.image.files[0];if(!f)throw Error('Fotoğraf seç.');const image=await compressImage(f);await api('/photo','POST',{image,replaceId:d.replaceId,avatar:form.elements.avatar.checked});form.reset();notice('Fotoğrafın onaya gönderildi.');loadApprovals();break;}
@@ -174,6 +174,6 @@ document.addEventListener('click',e=>{const go=e.target.closest('[data-go]');if(
  const a=e.target.closest('[data-act]');if(!a)return; if(a.dataset.act==='backdrop'&&e.target!==a)return;
  Promise.resolve(act(a)).catch(err=>notice(err.message,true));});
 document.addEventListener('change',e=>{if(e.target?.id==='tableGameSelect'){$('#gameDynamicSettings').innerHTML=gameSettings(e.target.value);}});
-document.addEventListener('submit',e=>{const f=e.target;if(!f.id)return;e.preventDefault();const btn=f.querySelector('button[type="submit"],button:not([type])');if(btn)btn.disabled=true;submit(f).catch(err=>notice(err.message,true)).finally(()=>{if(btn?.isConnected)btn.disabled=false;});});
+document.addEventListener('submit',e=>{const f=e.target;if(!(f instanceof HTMLFormElement)||!f.getAttribute('id'))return;e.preventDefault();const btn=f.querySelector('button[type="submit"],button:not([type])');if(btn)btn.disabled=true;submit(f).catch(err=>notice(err.message,true)).finally(()=>{if(btn?.isConnected)btn.disabled=false;});});
 window.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#overlayRoot').childElementCount)closeOverlay();});
 (async()=>{try{const config=await api('/config');state.games=config.games;await loadMe();if(!config.configured)notice('Yönetici hesabı henüz kurulmadı. Coolify ortam değişkenlerini ayarla.',true);}catch(e){$('#app').innerHTML=`<div class="alert">Arena Club sunucusu cevap vermedi: ${esc(e.message)}</div>`;}})();
