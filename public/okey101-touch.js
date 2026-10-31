@@ -31,7 +31,7 @@
   function markTarget(x,y){
     document.querySelectorAll('.ok101-drop-focus').forEach(n=>n.classList.remove('ok101-drop-focus'));
     const el=targetAt(x,y);
-    const place=el?.closest('[data-ok101-slot],.ok101-stackbox.discard,[data-ok101-rack]');
+    const place=el?.closest('[data-ok101-slot],.ok101-stackbox.discard,[data-ok101-rack],[data-ok101-meld-id],[data-ok101-finish-target]');
     if(place)place.classList.add('ok101-drop-focus');
   }
   document.addEventListener('pointerdown',e=>{
@@ -59,14 +59,25 @@
     const slot=el?.closest('[data-ok101-slot]');
     const toDiscard=el?.closest('.ok101-stackbox.discard');
     const onRack=el?.closest('[data-ok101-rack]');
+    const onMeld=el?.closest('[data-ok101-meld-id]');
+    const onFinish=el?.closest('[data-ok101-finish-target]');
     destroy();
     if(a.source.kind==='rack'&&slot){
       okey101MoveRackTile(a.source.id,Number(slot.dataset.ok101Slot));return;
     }
     const t=table(),phase=activePhase();if(!t||!t.okey101)return;
     let packet;
-    if(a.source.kind==='rack'&&toDiscard&&phase==='discard')packet={roomId:t.roomId,no:t.no,action:'discard',tileId:a.source.id};
-    if(a.source.kind!=='rack'&&onRack&&phase==='draw')packet={roomId:t.roomId,no:t.no,action:'draw',source:a.source.kind==='wall'?'wall':'discard'};
+    if(a.source.kind==='rack'&&toDiscard&&phase==='discard'){if(!okey101WarnDiscard(t,a.source.id))return;packet={roomId:t.roomId,no:t.no,action:'discard',tileId:a.source.id};}
+    if(a.source.kind==='rack'&&onFinish&&phase==='discard'&&game()?.hand?.length===1){if(!okey101WarnDiscard(t,a.source.id))return;packet={roomId:t.roomId,no:t.no,action:'discard',tileId:a.source.id};}
+    if(a.source.kind==='rack'&&onMeld&&phase==='discard'){
+      const match=t.okey101;const opened=match.players.find(p=>p.seat===match.selfSeat)?.opened;
+      if(!opened){notice('Önce 101 veya beş çift açmalısın.',true);return;}
+      const meldId=onMeld.dataset.ok101MeldId,hint=game()?.hints?.[a.source.id];
+      if(hint?.replaceMeldIds?.includes(meldId))packet={roomId:t.roomId,no:t.no,action:'replace_joker',meldId,tileId:a.source.id};
+      else if(hint?.appendMeldIds?.includes(meldId))packet={roomId:t.roomId,no:t.no,action:'add_to_meld',meldId,tileIds:[a.source.id]};
+      else{notice('Bu taşı hedef pere işleyemezsin.',true);return;}
+    }
+    if(a.source.kind!=='rack'&&onRack&&phase==='draw'){if(a.source.kind==='discard'&&!t.okey101.players.find(p=>p.seat===t.okey101.selfSeat)?.opened){try{await okey101AttemptDiscardDraw(t);}catch(err){notice(err.message,true);}return;}packet={roomId:t.roomId,no:t.no,action:'draw',source:a.source.kind==='wall'?'wall':'discard'};}
     if(!packet)return;
     if(busy)return;busy=true;
     try{
