@@ -69,7 +69,7 @@ test('admin grants premium membership and moderator role',async()=>{
 });
 test('admin rooms create/update and user room join',async()=>{
   const created=await call('/admin/room','POST',{name:'Özel Salon 2',game:'okey',tableCount:24},admin);assert.equal(created.status,201);assert.equal(created.body.room.tableCount,24);
-  const rooms=await call('/rooms','GET',null,member);assert.equal(rooms.body.rooms.length,2);
+  const rooms=await call('/rooms','GET',null,member);assert.ok(rooms.body.rooms.length>=2);assert.ok(rooms.body.rooms.some(r=>r.game==='101'));
   const out=await call('/room/enter','POST',{roomId},member);assert.equal(out.status,200);assert.equal(out.body.tables.length,40);
 });
 test('table rules prevent mixing different games in one salon',async()=>{
