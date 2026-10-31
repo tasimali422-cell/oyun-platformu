@@ -43,13 +43,13 @@ export function movablePawns(g,seat){
 export function startLudo(seats,settings={},now=Date.now()){
  if(![2,4].includes(seats.length))throw Error('Kızma Birader yalnızca 2 veya 4 oyuncuyla oynanır.');
  const colors=seats.length===2?[0,2]:[0,1,2,3];
- const players=seats.map((s,i)=>({name:String(s.name||'Oyuncu').slice(0,20),avatar:String(s.avatar||'').slice(0,512),token:s.token,color:colors[i],pawns:[-1,-1,-1,-1],forfeited:false}));
+ const players=seats.map((s,i)=>({name:String(s.name||'Oyuncu').slice(0,20),avatar:String(s.avatar||'').slice(0,512),token:s.token,color:colors[i],pawns:[-1,-1,-1,-1],forfeited:false,bot:false,timeouts:0}));
  if(new Set(players.map(p=>p.token)).size!==players.length||players.some(p=>!p.token))throw Error('Her oyuncu için ayrı oturum gereklidir.');
  const turnSeconds=LUDO_TURN_CHOICES.includes(Number(settings.turnSeconds))?Number(settings.turnSeconds):30;
- return {players,turn:0,dice:null,phase:'roll',sixStreak:0,turnSeconds,deadline:now+turnSeconds*1000,finished:false,winner:null,notice:'Maç başladı. Kırmızı oyuncu zar atacak.',events:['Maç başladı. Kırmızı oyuncu zar atacak.'],lastRoll:null,revision:0};
+ return {players,turn:0,dice:null,phase:'roll',sixStreak:0,turnSeconds,deadline:now+turnSeconds*1000,finished:false,winner:null,notice:'Maç başladı. Kırmızı oyuncu zar atacak.',events:['Maç başladı. Kırmızı oyuncu zar atacak.'],lastRoll:null,revision:0,sixSnapshot:null};
 }
 function nextTurn(g,now){
- g.dice=null;g.sixStreak=0;g.phase='roll';
+ g.dice=null;g.sixStreak=0;g.sixSnapshot=null;g.phase='roll';
  for(let k=0;k<g.players.length;k++){
   g.turn=(g.turn+1)%g.players.length;
   if(!current(g).forfeited)break;
@@ -62,12 +62,26 @@ export function rollLudo(g,seat,now=Date.now(),randomFn=randomInt){
  const value=randomFn(1,7);
  if(!Number.isInteger(value)||value<1||value>6)throw Error('Geçersiz zar kaynağı.');
  g.lastRoll={seat,value};
- if(value===6){g.sixStreak++;if(g.sixStreak===3){announce(g,`${current(g).name} üst üste üç kez 6 attı; sıra geçti.`);nextTurn(g,now);return;}}
+ if(value===6){
+  if(g.sixStreak===0)g.sixSnapshot=g.players.map(p=>[...p.pawns]);
+  g.sixStreak++;
+  if(g.sixStreak===3){
+   // Cancel the ENTIRE triple-six series (including earlier captures and advances).
+   if(g.sixSnapshot)g.players.forEach((p,i)=>{p.pawns=[...g.sixSnapshot[i]];});
+   announce(g,`${current(g).name} üst üste üç kez 6 attı; bu turdaki bütün hamleleri iptal edildi.`);
+   nextTurn(g,now);return;
+  }
+ }
  g.dice=value;g.phase='move';g.deadline=now+g.turnSeconds*1000;g.revision++;
  if(!movablePawns(g,seat).length){
   const player=current(g);announce(g,`${player.name} ${value} attı ama oynayabileceği piyon yok.`);
   if(value===6){extraTurn(g,now);}else nextTurn(g,now);
- }else announce(g,`${current(g).name} ${value} attı. Bir piyon seçmeli.`);
+ }else{
+  announce(g,`${current(g).name} ${value} attı. Bir piyon seçmeli.`);
+  // The only legal move is compulsory and is applied on the server.
+  const moves=movablePawns(g,seat);
+  if(moves.length===1)moveLudo(g,seat,moves[0],now);
+ }
 }
 export function moveLudo(g,seat,pawnIndex,now=Date.now()){
  assertPlaying(g,seat,'move',now);
@@ -106,7 +120,9 @@ export function forfeitLudo(g,token,now=Date.now()){
 }
 export function tickLudo(g,now=Date.now()){
  if(!g||g.finished||now<g.deadline)return false;
- const name=current(g).name;
+ const player=current(g),name=player.name;
+ player.timeouts=(player.timeouts||0)+1;
+ if(player.timeouts>=2){player.bot=true;player.botReason='timeouts';announce(g,`${name} süreyi iki kez aştı; yerine bot geçti.`);}
  nextTurn(g,now);
  announce(g,`${name} süre içinde hamle yapmadı; sırası geçti.`);
  return true;
@@ -114,5 +130,31 @@ export function tickLudo(g,now=Date.now()){
 export function viewLudo(g,token){
  if(!g)return null;
  const mine=g.players.findIndex(p=>p.token===token);
- return {players:g.players.map(({name,avatar,color,pawns,forfeited})=>({name,avatar,color,pawns:[...pawns],forfeited})),mySeat:mine,turn:g.turn,phase:g.phase,dice:g.dice,lastRoll:g.lastRoll,deadline:g.deadline,turnSeconds:g.turnSeconds,finished:g.finished,winner:g.winner,notice:g.notice,events:[...g.events],legalMoves:mine>=0?movablePawns(g,mine):[],revision:g.revision};
+ return {players:g.players.map(({name,avatar,color,pawns,forfeited,bot})=>({name,avatar,color,pawns:[...pawns],forfeited,bot:!!bot})),mySeat:mine,turn:g.turn,phase:g.phase,dice:g.dice,lastRoll:g.lastRoll,deadline:g.deadline,turnSeconds:g.turnSeconds,finished:g.finished,winner:g.winner,notice:g.notice,events:[...g.events],legalMoves:mine>=0?movablePawns(g,mine):[],revision:g.revision};
+}
+
+/** Bot is always bound to its original player's seat. Never trust browser dice. */
+export function playBotLudo(g,now=Date.now(),randomFn=randomInt){
+ if(!g||g.finished||!g.players[g.turn]?.bot)return false;
+ const seat=g.turn;
+ if(g.deadline<=now)g.deadline=now+g.turnSeconds*1000;
+ if(g.phase==='roll')rollLudo(g,seat,now,randomFn);
+ else if(g.phase==='move'){
+  const options=movablePawns(g,seat);
+  if(options.length){
+   const currentPlayer=g.players[seat];
+   const rank=i=>{const from=currentPlayer.pawns[i],to=from<0?0:from+g.dice;
+    const square=globalSquare(currentPlayer.color,to);
+    let captures=0;
+    if(square!==null&&!LUDO_SAFE.includes(square))for(const other of g.players){
+     if(other===currentPlayer)continue;
+     captures+=other.pawns.filter(s=>globalSquare(other.color,s)===square).length;
+    }
+    return (to===56?10000:0)+captures*300+(square!==null&&LUDO_SAFE.includes(square)?20:0)+to;
+   };
+   options.sort((a,b)=>rank(b)-rank(a));
+   moveLudo(g,seat,options[0],now);
+  }else nextTurn(g,now);
+ }
+ return true;
 }
