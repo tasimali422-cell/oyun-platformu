@@ -2,6 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { WebSocketServer, WebSocket } from 'ws';
+import { startLudo, rollLudo, moveLudo, tickLudo, playBotLudo, viewLudo } from '../ludo.js';
+import { ludoPointDeltas } from './ludo-scoring.js';
 
 const now = () => Date.now();
 const ident = () => crypto.randomUUID();
@@ -41,13 +43,17 @@ function originSafe(req){const origin=req.headers.origin;if(!origin)return true;
 export function createClub({dataFile=process.env.ARENA_CLUB_DATA_PATH||path.resolve('data/club.json')}={}){
   fs.mkdirSync(path.dirname(dataFile),{recursive:true});
   const mediaDir=path.join(path.dirname(dataFile),'club-media');fs.mkdirSync(mediaDir,{recursive:true});
-  const fresh=()=>({schema:1,users:[],sessions:[],tournaments:[],rooms:[{id:ident(),name:'Kızma Birader Salonu',game:'ludo',tableCount:40,ownerId:null,rentalUntil:null}],tables:[],approvals:[],reports:[],announcements:[],vipChat:[],tableChats:{},dm:[],audit:[]});
+  const fresh=()=>({schema:1,users:[],sessions:[],tournaments:[],rooms:[{id:ident(),name:'Kızma Birader Salonu',game:'ludo',tableCount:40,ownerId:null,rentalUntil:null}],tables:[],approvals:[],reports:[],announcements:[],vipChat:[],tableChats:{},dm:[],audit:[],ludoGames:{},matchHistory:[]});
   let db=fs.existsSync(dataFile)?JSON.parse(fs.readFileSync(dataFile,'utf8')):fresh();
   for(const [k,v] of Object.entries(fresh()))if(db[k]===undefined)db[k]=v;
   function save(){const tmp=`${dataFile}.${process.pid}.tmp`;fs.writeFileSync(tmp,JSON.stringify(db),{mode:0o600});fs.renameSync(tmp,dataFile);}
   if(!fs.existsSync(dataFile))save();
   // Açık masa/mesajlar canlı oturumlara bağlıdır; yeniden dağıtımda hayalet masalar kalmasın.
-  if(db.tables.length||Object.keys(db.tableChats).length){db.tables=[];db.tableChats={};save();}
+  if(db.tables.length||Object.keys(db.tableChats).length){
+    // Only running Ludo tables survive deploy. Do not wipe the rest of Club data.
+    db.tables=db.tables.filter(t=>t.game==='ludo'&&db.ludoGames?.[`${t.roomId}:${t.no}`]&&!db.ludoGames[`${t.roomId}:${t.no}`].game.finished);
+    db.tableChats=Object.fromEntries(Object.entries(db.tableChats).filter(([key])=>db.tables.some(t=>`${t.roomId}:${t.no}`===key)));save();
+  }
   const adminEmail=email(process.env.ARENA_CLUB_ADMIN_EMAIL);
   const adminPassword=process.env.ARENA_CLUB_ADMIN_PASSWORD||'';
   if(!db.users.some(u=>u.role==='admin')&&adminEmail&&adminPassword.length>=12&&/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(adminEmail)){
@@ -65,8 +71,8 @@ export function createClub({dataFile=process.env.ARENA_CLUB_DATA_PATH||path.reso
   const isBanned=u=>Boolean(u?.bannedUntil&&u.bannedUntil>now());
   const publicTournament=t=>({id:t.id,name:t.name,game:t.game,startAt:t.startAt,status:t.status,maxPlayers:t.maxPlayers,participants:t.participants.length,winnerName:t.winnerId?userById(t.winnerId)?.name:null,rewardTier:t.rewardTier||null,joined:t.participants});
   const publicRoom=r=>({id:r.id,name:r.name,game:r.game,tableCount:r.tableCount,rentalUntil:r.rentalUntil||null,ownerId:r.ownerId||null,online:[...presence.values()].filter(p=>p.roomId===r.id&&p.expires>now()).length});
-  function serializeTable(t){const members=[...presence.entries()].filter(([id,p])=>p.roomId===t.roomId&&p.tableNo===t.no&&p.expires>now()).map(([id,p])=>({user:publicUser(userById(id)),as:p.as}));return {...t,members,chat:(db.tableChats[tableKey(t.roomId,t.no)]||[]).slice(-50),gameReady:false};}
-  const tableSummary=(r)=>Array.from({length:r.tableCount},(_,i)=>{const no=i+1,t=currentTable(r.id,no);const members=t?[...presence.values()].filter(p=>p.roomId===r.id&&p.tableNo===no&&p.as==='player'&&p.expires>now()).length:0;return {no,ownerId:t?.ownerId||null,game:t?.game||r.game,players:members,max:t?.maxPlayers||4,locked:t?.spectators===false};});
+  function serializeTable(t,viewerId=null){const active=db.ludoGames[tableKey(t.roomId,t.no)];const members=[...presence.entries()].filter(([id,p])=>p.roomId===t.roomId&&p.tableNo===t.no&&p.expires>now()).map(([id,p])=>({user:publicUser(userById(id)),as:p.as}));return {...t,members,chat:(db.tableChats[tableKey(t.roomId,t.no)]||[]).slice(-50),gameReady:t.game==='ludo',ludo:active?{matchId:active.id,state:viewLudo(active.game,viewerId),result:active.result||null}:null};}
+  const tableSummary=(r)=>Array.from({length:r.tableCount},(_,i)=>{const no=i+1,t=currentTable(r.id,no);const members=t?[...presence.values()].filter(p=>p.roomId===r.id&&p.tableNo===no&&p.as==='player'&&p.expires>now()).length:0;return {no,ownerId:t?.ownerId||null,game:t?.game||r.game,players:members,max:t?.maxPlayers||4,locked:t?.spectators===false,playing:!!(t&&db.ludoGames[tableKey(r.id,no)]&&!db.ludoGames[tableKey(r.id,no)].game.finished)};});
   function self(u){return {...publicUser(u),email:u.email,banUntil:u.bannedUntil||null,csrf:''};}
   function getSession(req){const token=cookie(req,'arena_club_session');if(!token)return null;const s=db.sessions.find(x=>x.hash===digest(token)&&x.expires>now());if(!s)return null;const u=userById(s.userId);return u&&!isBanned(u)?{u,s}:null;}
   function auth(req){const found=getSession(req);if(!found)throw HttpError('Oturum açmanız gerekiyor.',401);return found;}
@@ -79,10 +85,53 @@ export function createClub({dataFile=process.env.ARENA_CLUB_DATA_PATH||path.reso
   function audit(actor,action,detail=''){db.audit.unshift({id:ident(),actor:actor?.id||null,action,detail:clean(detail,160),time:now()});db.audit=db.audit.slice(0,500);}
   function liveUsers(roomId){return [...presence.entries()].filter(([id,p])=>p.roomId===roomId&&p.expires>now()).map(([id])=>publicUser(userById(id)));}
   function syncRoom(roomId){const r=roomById(roomId);if(!r)return;const packet={type:'room_state',room:publicRoom(r),tables:tableSummary(r),users:liveUsers(roomId),announcements:db.announcements.slice(-15),vipChat:db.vipChat.filter(m=>m.roomId===roomId).slice(-35)};for(const [ws,id] of connections){const u=userById(id);if(presence.get(id)?.roomId===roomId){send(ws,{...packet,vipChat:isPremium(u)?packet.vipChat:[]});}}}
-  function syncTable(roomId,no){const t=currentTable(roomId,no);if(!t)return;const packet={type:'table_state',table:serializeTable(t)};for(const [ws,id] of connections)if(presence.get(id)?.roomId===roomId&&presence.get(id)?.tableNo===no)send(ws,packet);}
+  function syncTable(roomId,no){const t=currentTable(roomId,no);if(!t)return;for(const [ws,id] of connections)if(presence.get(id)?.roomId===roomId&&presence.get(id)?.tableNo===no)send(ws,{type:'table_state',table:serializeTable(t,id)});}
   function emitRoom(roomId,packet,test=()=>true){for(const [ws,id] of connections)if(presence.get(id)?.roomId===roomId&&test(userById(id)))send(ws,packet);}
   function prune(){for(const [id,p] of presence){if(p.expires<=now()){presence.delete(id);if(p.tableNo)syncTable(p.roomId,p.tableNo);syncRoom(p.roomId);}}}
-  const timer=setInterval(prune,5000);timer.unref();
+  function ludoEntry(roomId,no){return db.ludoGames[tableKey(roomId,no)];}
+  function liveLudoUsers(entry){return entry.game.players.filter(p=>{
+    const q=presence.get(p.token);return q?.roomId===entry.roomId&&q.tableNo===entry.no&&q.as==='player'&&q.expires>now()&&q.ws?.readyState===WebSocket.OPEN;
+  });}
+  function recordLudoWin(entry){
+    if(!entry.game.finished||entry.settled)return;
+    const winner=entry.game.winner,players=entry.game.players;
+    if(winner===null||!Number.isInteger(winner)||![2,4].includes(players.length))return;
+    const deltas=ludoPointDeltas(players.length,winner);
+    entry.result={winnerId:players[winner].token,points:players.map((p,i)=>({userId:p.token,name:p.name,delta:deltas[i]})),finishedAt:now()};
+    for(let i=0;i<players.length;i++){
+      const member=userById(players[i].token);if(!member)continue;
+      member.points=(member.points||0)+deltas[i];member.weeklyPoints=(member.weeklyPoints||0)+deltas[i];
+      if(i===winner)member.wins=(member.wins||0)+1;
+    }
+    entry.settled=true;
+    db.matchHistory.push({id:entry.id,roomId:entry.roomId,tableNo:entry.no,game:'ludo',...entry.result});
+    db.matchHistory=db.matchHistory.slice(-2000);audit(null,'ludo_result',`${entry.id}: ${players[winner].name} +6`);save();
+  }
+  function updateLudoPresence(entry){
+    const online=liveLudoUsers(entry);
+    if(!online.length){if(!entry.sleeping){entry.sleeping=true;save();}return false;} // No unattended point farming.
+    const time=now();let dirty=false;
+    if(entry.sleeping){entry.sleeping=false;entry.game.deadline=time+entry.game.turnSeconds*1000;dirty=true;}
+    for(const p of entry.game.players){
+      const here=online.some(q=>q.token===p.token);
+      if(here){if(p.disconnectedAt){if(p.botReason==='disconnect')p.bot=false;p.disconnectedAt=null;p.botReason=null;dirty=true;}}
+      else if(!p.disconnectedAt){p.disconnectedAt=time;dirty=true;}
+      else if(!p.bot&&time-p.disconnectedAt>=25000){p.bot=true;p.botReason='disconnect';dirty=true;}
+    }
+    if(dirty)save();return true;
+  }
+  function ludoTick(){
+    for(const entry of Object.values(db.ludoGames)){
+      const g=entry.game;if(g.finished)continue;
+      if(!updateLudoPresence(entry))continue;
+      const time=now();let changed=false;
+      if(g.players[g.turn].bot){
+        if(!entry.botActionAt||time-entry.botActionAt>=1200){changed=playBotLudo(g,time);entry.botActionAt=time;}
+      }else changed=tickLudo(g,time);
+      if(changed){recordLudoWin(entry);save();syncTable(entry.roomId,entry.no);syncRoom(entry.roomId);}
+    }
+  }
+  const timer=setInterval(()=>{prune();ludoTick();},1000);timer.unref();
   function messageBucket(key){const stamp=`${key}`;const old=rate.get(stamp)||0;if(now()-old<900)throw HttpError('Mesaj göndermeden önce biraz bekleyin.',429);rate.set(stamp,now());}
   function validateSettings(game,settings={}){
     if(!games[game])throw HttpError('Oyun türü bulunamadı.');
@@ -122,7 +171,7 @@ export function createClub({dataFile=process.env.ARENA_CLUB_DATA_PATH||path.reso
       if(route.startsWith('/media/')&&method==='GET'){fileResponse(req,res,route.split('/').pop());return true;}
       if(route==='/tournaments'&&method==='GET'){respond(res,200,{tournaments:db.tournaments.map(publicTournament)});return true;}
       if(route==='/leaderboard'&&method==='GET'){respond(res,200,{players:db.users.slice().sort((a,b)=>(b.weeklyPoints||0)-(a.weeklyPoints||0)).slice(0,25).map(publicUser)});return true;}
-      if(route==='/config'&&method==='GET'){return respond(res,200,{games,configured:db.users.some(u=>u.role==='admin'),version:'2.1.0'}),true;}
+      if(route==='/config'&&method==='GET'){return respond(res,200,{games,configured:db.users.some(u=>u.role==='admin'),version:'2.2.0'}),true;}
       if(route==='/register'&&method==='POST'){
         const ip=String(req.headers['x-forwarded-for']||req.socket.remoteAddress||'').split(',')[0].slice(0,64);
         const key=`reg:${ip}`;const row=rate.get(key)||{count:0,start:now()};if(now()-row.start>3600000){row.count=0;row.start=now();}if(++row.count>12)throw HttpError('Çok sayıda kayıt denemesi. Daha sonra yeniden deneyin.',429);rate.set(key,row);
@@ -179,7 +228,7 @@ export function createClub({dataFile=process.env.ARENA_CLUB_DATA_PATH||path.reso
       if(route==='/room/enter'&&method==='POST'){
         const r=roomById(d.roomId);if(!r)throw HttpError('Salon bulunamadı.',404);
         const p=presence.get(u.id);if(p?.tableNo){const oldNo=p.tableNo;p.tableNo=null;p.as=null;syncTable(p.roomId,oldNo);}
-        presence.set(u.id,{roomId:r.id,tableNo:null,as:null,expires:now()+45000});syncRoom(r.id);respond(res,200,{room:publicRoom(r),tables:tableSummary(r),announcements:db.announcements.slice(-15),vipChat:isPremium(u)?db.vipChat.filter(m=>m.roomId===r.id).slice(-35):[],users:liveUsers(r.id)});return true;
+        presence.set(u.id,{roomId:r.id,tableNo:null,as:null,expires:now()+45000,ws:[...connections].find(([,id])=>id===u.id)?.[0]||null});syncRoom(r.id);respond(res,200,{room:publicRoom(r),tables:tableSummary(r),announcements:db.announcements.slice(-15),vipChat:isPremium(u)?db.vipChat.filter(m=>m.roomId===r.id).slice(-35):[],users:liveUsers(r.id)});return true;
       }
       if(route==='/room/leave'&&method==='POST'){
         const p=presence.get(u.id);if(p){presence.delete(u.id);syncRoom(p.roomId);if(p.tableNo)syncTable(p.roomId,p.tableNo);};respond(res,200,{ok:true});return true;
@@ -189,24 +238,73 @@ export function createClub({dataFile=process.env.ARENA_CLUB_DATA_PATH||path.reso
         if(current?.tableNo){const oldNo=current.tableNo,oldRoom=current.roomId;presence.set(u.id,{roomId:oldRoom,expires:now()+45000});syncTable(oldRoom,oldNo);syncRoom(oldRoom);}
         let t=currentTable(r.id,no);if(!t){if(d.as==='spectator')throw HttpError('Henüz kurulmamış masayı izleyemezsiniz.');t=tableInit(u,r.id,no,d.settings||{});}
         const as=d.as==='spectator'?'spectator':'player';if(as==='spectator'&&!t.spectators)throw HttpError('Masa sahibi izleyici girişini kapatmış.');
+        const inProgress=ludoEntry(r.id,no);
+        if(t.game==='ludo'&&inProgress&&!inProgress.game.finished&&as==='player'&&!inProgress.game.players.some(p=>p.token===u.id))throw HttpError('Maç başladı. Yeni oyuncu alınamıyor; izleyici olarak katılabilirsiniz.',409);
+
         if(as==='player'){
-          const count=[...presence.values()].filter(p=>p.roomId===r.id&&p.tableNo===no&&p.as==='player'&&p.expires>now()).length;
+          const count=[...presence.entries()].filter(([id,p])=>id!==u.id&&p.roomId===r.id&&p.tableNo===no&&p.as==='player'&&p.expires>now()).length;
           if(count>=t.maxPlayers)throw HttpError('Masa dolu.');
         }
-        presence.set(u.id,{roomId:r.id,tableNo:no,as,expires:now()+45000});syncTable(r.id,no);syncRoom(r.id);respond(res,200,{table:serializeTable(t)});return true;
+        presence.set(u.id,{roomId:r.id,tableNo:no,as,expires:now()+45000,ws:[...connections].find(([,id])=>id===u.id)?.[0]||null});
+        // A reconnecting player takes back their seat from the bot.
+        if(inProgress&&!inProgress.game.finished&&as==='player'){const p=inProgress.game.players.find(p=>p.token===u.id);if(p){p.bot=false;p.botReason=null;p.disconnectedAt=null;save();}}
+        syncTable(r.id,no);syncRoom(r.id);respond(res,200,{table:serializeTable(t,u.id)});return true;
       }
       if(route==='/table/leave'&&method==='POST'){
         const p=presence.get(u.id);if(!p?.tableNo)throw HttpError('Masada değilsiniz.');const roomId=p.roomId,no=p.tableNo;presence.set(u.id,{...p,tableNo:null,as:null,expires:now()+45000});
-        const t=currentTable(roomId,no);const seatIds=[...presence.entries()].filter(([id,q])=>q.roomId===roomId&&q.tableNo===no&&q.as==='player'&&q.expires>now()).map(([id])=>id);const others=[...presence.values()].some(q=>q.roomId===roomId&&q.tableNo===no&&q.expires>now());if(t&&t.ownerId===u.id&&seatIds.length){t.ownerId=seatIds[0];save();}if(t&&!seatIds.length){for(const [id,q] of presence)if(q.roomId===roomId&&q.tableNo===no){presence.set(id,{roomId,tableNo:null,as:null,expires:now()+45000});for(const [ws,connectedId] of connections)if(connectedId===id)send(ws,{type:'table_closed',roomId,no});}db.tables=db.tables.filter(x=>x!==t);delete db.tableChats[tableKey(roomId,no)];save();}
+        const t=currentTable(roomId,no);const seatIds=[...presence.entries()].filter(([id,q])=>q.roomId===roomId&&q.tableNo===no&&q.as==='player'&&q.expires>now()).map(([id])=>id);const others=[...presence.values()].some(q=>q.roomId===roomId&&q.tableNo===no&&q.expires>now());if(t&&t.ownerId===u.id&&seatIds.length){t.ownerId=seatIds[0];save();}if(t&&!seatIds.length&&!ludoEntry(roomId,no)){ for(const [id,q] of presence)if(q.roomId===roomId&&q.tableNo===no){presence.set(id,{roomId,tableNo:null,as:null,expires:now()+45000});for(const [ws,connectedId] of connections)if(connectedId===id)send(ws,{type:'table_closed',roomId,no});}db.tables=db.tables.filter(x=>x!==t);delete db.tableChats[tableKey(roomId,no)];save();}
         syncTable(roomId,no);syncRoom(roomId);respond(res,200,{ok:true});return true;
       }
       if(route==='/table/settings'&&method==='PATCH'){
         const t=currentTable(d.roomId,Number(d.no));if(!t)throw HttpError('Masa bulunamadı.',404);
         if(t.ownerId!==u.id&&u.role!=='admin')throw HttpError('Yalnız masa sahibi kuralları düzenleyebilir.',403);
-        if(d.settings?.game&&d.settings.game!==t.game)throw HttpError('Bu masanın oyun türü salonla aynıdır; değiştirilemez.',409);const updated=validateSettings(t.game,{...t,...d.settings});const playerCount=[...presence.values()].filter(p=>p.roomId===t.roomId&&p.tableNo===t.no&&p.as==='player'&&p.expires>now()).length;
+        if(d.settings?.game&&d.settings.game!==t.game)throw HttpError('Bu masanın oyun türü salonla aynıdır; değiştirilemez.',409);if(t.game==='ludo'&&ludoEntry(t.roomId,t.no)&&!ludoEntry(t.roomId,t.no).game.finished)throw HttpError('Maç sürerken oyun kuralları değiştirilemez.',409);const updated=validateSettings(t.game,{...t,...d.settings});const playerCount=[...presence.values()].filter(p=>p.roomId===t.roomId&&p.tableNo===t.no&&p.as==='player'&&p.expires>now()).length;
         if(playerCount>updated.maxPlayers)throw HttpError('Oyuncu sayısının altında kapasite seçilemez.');Object.assign(t,updated);
         if(!t.spectators){for(const [id,p] of presence)if(p.roomId===t.roomId&&p.tableNo===t.no&&p.as==='spectator')presence.set(id,{roomId:t.roomId,expires:now()+45000});}
         save();syncRoom(t.roomId);syncTable(t.roomId,t.no);respond(res,200,{table:serializeTable(t)});return true;
+      }
+      if(route==='/table/ludo/start'&&method==='POST'){
+        const no=Number(d.no),t=currentTable(d.roomId,no),r=roomById(d.roomId);
+        if(!t||t.game!=='ludo'||!r)throw HttpError('Kızma Birader masası bulunamadı.',404);
+        requireInTable(u,r.id,no);
+        if(t.ownerId!==u.id&&u.role!=='admin')throw HttpError('Maçı yalnız masa sahibi başlatabilir.',403);
+        const previous=ludoEntry(r.id,no);
+        if(previous&&!previous.game.finished)throw HttpError('Bu masada zaten aktif maç var.',409);
+        const ids=[...presence.entries()].filter(([id,p])=>p.roomId===r.id&&p.tableNo===no&&p.as==='player'&&p.expires>now()&&p.ws?.readyState===WebSocket.OPEN).map(([id])=>id);
+        if(ids.length!==t.maxPlayers||![2,4].includes(ids.length))throw HttpError(`Maçı başlatmak için tam ${t.maxPlayers} çevrimiçi oyuncu gerekli.`,409);
+        const seats=ids.map(id=>{const member=userById(id);return {token:id,name:member.name,avatar:member.avatarId?`/api/club/media/${member.avatarId}`:''};});
+        const g=startLudo(seats,{turnSeconds:t.turnSeconds});
+        db.ludoGames[tableKey(r.id,no)]={id:ident(),roomId:r.id,no,game:g,createdAt:now(),settled:false};
+        audit(u,'ludo_start',`${r.name} Masa ${no}`);save();syncTable(r.id,no);syncRoom(r.id);
+        respond(res,201,{table:serializeTable(t,u.id)});return true;
+      }
+      if(route==='/table/ludo/takeover'&&method==='POST'){
+        const no=Number(d.no),t=currentTable(d.roomId,no),entry=ludoEntry(d.roomId,no);
+        if(!t||!entry||entry.game.finished)throw HttpError('Devralınacak aktif maç yok.',404);
+        const p=requireInTable(u,t.roomId,t.no);
+        if(p.as!=='player')throw HttpError('Oyuncu koltuğu gerekli.',403);
+        const seat=entry.game.players.find(x=>x.token===u.id);
+        if(!seat)throw HttpError('Bu maçın oyuncusu değilsin.',403);
+        seat.bot=false;seat.botReason=null;seat.disconnectedAt=null;seat.timeouts=0;
+        if(entry.game.players[entry.game.turn]===seat)entry.game.deadline=now()+entry.game.turnSeconds*1000;
+        save();syncTable(t.roomId,t.no);respond(res,200,{table:serializeTable(t,u.id)});return true;
+      }
+      if(['/table/ludo/roll','/table/ludo/move'].includes(route)&&method==='POST'){
+        const no=Number(d.no),t=currentTable(d.roomId,no),entry=ludoEntry(d.roomId,no);
+        if(!t||t.game!=='ludo'||!entry)throw HttpError('Aktif Kızma Birader maçı yok.',404);
+        const inSeat=requireInTable(u,t.roomId,t.no);
+        if(inSeat.as!=='player')throw HttpError('İzleyiciler hamle yapamaz.',403);
+        const seat=entry.game.players.findIndex(p=>p.token===u.id);
+        if(seat<0)throw HttpError('Bu maçın oyuncusu değilsin.',403);
+        if(entry.game.players[seat].bot)throw HttpError('Bot koltuğunu devralmak için masaya yeniden katıl.',409);
+        try{if(route.endsWith('/roll'))rollLudo(entry.game,seat);
+        else moveLudo(entry.game,seat,d.pawn);}
+        catch(error){throw HttpError(error.message,409);}
+        entry.game.players[seat].timeouts=0;recordLudoWin(entry);save();syncTable(t.roomId,t.no);syncRoom(t.roomId);
+        respond(res,200,{table:serializeTable(t,u.id)});return true;
+      }
+      if(route==='/matches/mine'&&method==='GET'){
+        respond(res,200,{matches:db.matchHistory.filter(m=>m.points.some(p=>p.userId===u.id)).slice(-30)});return true;
       }
       if(route==='/chat/table'&&method==='POST'){
         const no=Number(d.no),p=requireInTable(u,d.roomId,no),t=currentTable(d.roomId,no);
@@ -250,9 +348,9 @@ export function createClub({dataFile=process.env.ARENA_CLUB_DATA_PATH||path.reso
         if(target.id===u.id&&d.role&&d.role!=='admin')throw HttpError('Kendi yönetici rolünüzü kaldıramazsınız.');
         if(d.role!==undefined){if(!roleNames.has(d.role))throw HttpError('Geçersiz rol.');target.role=d.role;}
         if(d.tier!==undefined){if(!tierNames.has(d.tier))throw HttpError('Geçersiz üyelik.');const exp=d.tierExpires?new Date(d.tierExpires).getTime():null;if(exp!==null&&!Number.isFinite(exp))throw HttpError('Üyelik bitiş tarihi geçersiz.');target.tier=d.tier;target.tierExpires=exp;}
-        if(d.points!==undefined)target.points=strictLimit(Number(d.points),0,100000000,'Puan');
+        if(d.points!==undefined)target.points=strictLimit(Number(d.points),-100000000,100000000,'Puan');
         if(d.wins!==undefined)target.wins=strictLimit(Number(d.wins),0,100000000,'Galibiyet');
-        if(d.weeklyPoints!==undefined)target.weeklyPoints=strictLimit(Number(d.weeklyPoints),0,100000000,'Haftalık puan');
+        if(d.weeklyPoints!==undefined)target.weeklyPoints=strictLimit(Number(d.weeklyPoints),-100000000,100000000,'Haftalık puan');
         audit(u,'user_edit',target.username);save();respond(res,200,{user:publicUser(target)});return true;
       }
       if(route==='/admin/ban'&&method==='POST'){
