@@ -83,7 +83,7 @@ export function createClub({dataFile=process.env.ARENA_CLUB_DATA_PATH||path.reso
   const isBanned=u=>Boolean(u?.bannedUntil&&u.bannedUntil>now());
   const publicTournament=t=>({id:t.id,name:t.name,game:t.game,startAt:t.startAt,status:t.status,maxPlayers:t.maxPlayers,participants:t.participants.length,winnerName:t.winnerId?userById(t.winnerId)?.name:null,rewardTier:t.rewardTier||null,joined:t.participants});
   const publicRoom=r=>({id:r.id,name:r.name,game:r.game,tableCount:r.tableCount,rentalUntil:r.rentalUntil||null,ownerId:r.ownerId||null,online:[...presence.values()].filter(p=>p.roomId===r.id&&p.expires>now()).length});
-  function serializeTable(t,viewerId=null){const active=db.ludoGames[tableKey(t.roomId,t.no)];const active101=db.okey101Games[tableKey(t.roomId,t.no)];const members=[...presence.entries()].filter(([id,p])=>p.roomId===t.roomId&&p.tableNo===t.no&&p.expires>now()).map(([id,p])=>({user:publicUser(userById(id)),as:p.as,connected:isConnectedPlayer(p)}));return {...t,members,chat:(db.tableChats[tableKey(t.roomId,t.no)]||[]).slice(-50),gameReady:['ludo','101'].includes(t.game),ludo:active?{matchId:active.id,state:viewLudo(active.game,viewerId),result:active.result||null}:null,okey101:active101?view101(active101,presence.get(viewerId)?.as==='player'?viewerId:null):null};}
+  function serializeTable(t,viewerId=null){const active=db.ludoGames[tableKey(t.roomId,t.no)];const active101=db.okey101Games[tableKey(t.roomId,t.no)];const members=[...presence.entries()].filter(([id,p])=>p.roomId===t.roomId&&p.tableNo===t.no&&p.expires>now()).map(([id,p])=>({user:publicUser(userById(id)),as:p.as,connected:isConnectedPlayer(p)}));return {...t,members,chat:(db.tableChats[tableKey(t.roomId,t.no)]||[]).slice(-50),gameReady:['ludo','101'].includes(t.game),ludo:active?{matchId:active.id,state:viewLudo(active.game,viewerId),result:active.result||null}:null,okey101:active101?view101(active101,(presence.get(viewerId)?.as==='player'&&presence.get(viewerId)?.roomId===t.roomId&&presence.get(viewerId)?.tableNo===t.no)?viewerId:null):null};}
   const tableSummary=(r)=>Array.from({length:r.tableCount},(_,i)=>{const no=i+1,t=currentTable(r.id,no);const members=t?[...presence.values()].filter(p=>p.roomId===r.id&&p.tableNo===no&&p.as==='player'&&p.expires>now()).length:0;return {no,ownerId:t?.ownerId||null,game:t?.game||r.game,players:members,max:t?.maxPlayers||4,locked:t?.spectators===false,playing:!!(t&&((db.ludoGames[tableKey(r.id,no)]&&!db.ludoGames[tableKey(r.id,no)].game.finished)||(db.okey101Games[tableKey(r.id,no)]&&db.okey101Games[tableKey(r.id,no)].phase==='playing')))};});
   function self(u){return {...publicUser(u),email:u.email,banUntil:u.bannedUntil||null,csrf:''};}
   function getSession(req){const token=cookie(req,'arena_club_session');if(!token)return null;const s=db.sessions.find(x=>x.hash===digest(token)&&x.expires>now());if(!s)return null;const u=userById(s.userId);return u&&!isBanned(u)?{u,s}:null;}
@@ -167,7 +167,18 @@ export function createClub({dataFile=process.env.ARENA_CLUB_DATA_PATH||path.reso
     const playerIds=[...presence.entries()].filter(([id,x])=>x.roomId===roomId&&x.tableNo===no&&x.as==='player').map(([id])=>id);
     const aI=playerIds.indexOf(a.id),bI=playerIds.indexOf(b.id);return aI>=0&&bI>=0&&aI!==bI&&aI%2===bI%2;
   }
-  function requireInTable(u,roomId,no){const p=presence.get(u.id);if(!p||p.roomId!==roomId||p.tableNo!==no||p.expires<=now())throw HttpError('Önce masaya katılın.',403);return p;}
+  function requireInTable(u,roomId,no){
+    let p=presence.get(u.id);const active=currentTable(roomId,no)?.game==='101'?entry101(roomId,no):null;
+    const registered=active&&active.phase!=='finished'&&active.players.some(x=>x.id===u.id);
+    // Restore only a registered 101 participant after a lost/restarted presence.
+    // Never take an occupied seat of a different account, and do not undo an explicit leave.
+    if((!p||p.expires<=now())&&registered){
+      p={roomId,tableNo:no,as:'player',expires:now()+45000,lastPulse:now(),ws:[...connections].find(([,id])=>id===u.id)?.[0]||null};
+      presence.set(u.id,p);syncTable(roomId,no);syncRoom(roomId);
+    }
+    if(!p||p.roomId!==roomId||p.tableNo!==no||p.expires<=now())throw HttpError('Önce masaya katılın.',403);
+    return p;
+  }
   function fileResponse(req,res,id){const request= db.approvals.find(a=>a.type==='photo'&&a.payload?.photoId===id);const owner=db.users.find(u=>(u.photos||[]).some(p=>p.id===id));const session=getSession(req);if(!owner&&!request)throw HttpError('Görsel bulunamadı.',404);
     if(!owner&&(!session||(session.u.id!==request.userId&&!isStaff(session.u))))throw HttpError('Görsel onay bekliyor.',403);
     const file=path.join(mediaDir,id);if(!/^[0-9a-f-]{36}$/.test(id)||!fs.existsSync(file))throw HttpError('Görsel dosyası bulunamadı.',404);
@@ -240,8 +251,9 @@ export function createClub({dataFile=process.env.ARENA_CLUB_DATA_PATH||path.reso
       }
       if(route==='/room/enter'&&method==='POST'){
         const r=roomById(d.roomId);if(!r)throw HttpError('Salon bulunamadı.',404);
-        const p=presence.get(u.id);if(p?.tableNo){const oldNo=p.tableNo;p.tableNo=null;p.as=null;syncTable(p.roomId,oldNo);}
-        presence.set(u.id,{roomId:r.id,tableNo:null,as:null,expires:now()+45000,lastPulse:now(),ws:[...connections].find(([,id])=>id===u.id)?.[0]||null});syncRoom(r.id);respond(res,200,{room:publicRoom(r),tables:tableSummary(r),announcements:db.announcements.slice(-15),vipChat:isPremium(u)?db.vipChat.filter(m=>m.roomId===r.id).slice(-35):[],users:liveUsers(r.id)});return true;
+        const p=presence.get(u.id);const playingHere=Boolean(p?.roomId===r.id&&p.tableNo&&p.as==='player'&&entry101(p.roomId,p.tableNo)?.phase==='playing'&&entry101(p.roomId,p.tableNo)?.players.some(x=>x.id===u.id));
+        if(p?.tableNo&&!playingHere){const oldNo=p.tableNo;p.tableNo=null;p.as=null;syncTable(p.roomId,oldNo);}
+        presence.set(u.id,{roomId:r.id,tableNo:playingHere?p.tableNo:null,as:playingHere?'player':null,expires:now()+45000,lastPulse:now(),ws:[...connections].find(([,id])=>id===u.id)?.[0]||null});syncRoom(r.id);respond(res,200,{room:publicRoom(r),tables:tableSummary(r),announcements:db.announcements.slice(-15),vipChat:isPremium(u)?db.vipChat.filter(m=>m.roomId===r.id).slice(-35):[],users:liveUsers(r.id)});return true;
       }
       if(route==='/room/leave'&&method==='POST'){
         const p=presence.get(u.id);if(p){presence.delete(u.id);syncRoom(p.roomId);if(p.tableNo)syncTable(p.roomId,p.tableNo);};respond(res,200,{ok:true});return true;
