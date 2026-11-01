@@ -18,9 +18,10 @@ test('101 Okey: ilk oyuncu taş atar, ikinci oyuncu çeker ve atar',()=>{
  const m=newMatch(seats);const first=m.game.hands[seats[0].id][0].id;
  action(m,seats[0].id,{action:'discard',tileId:first});assert.equal(m.game.currentSeat,1);assert.equal(m.game.turnPhase,'draw');
  assert.throws(()=>action(m,seats[1].id,{action:'discard',tileId:m.game.hands[seats[1].id][0].id}),/çekmelisin/i);
- action(m,seats[1].id,{action:'draw',source:'discard'});assert.equal(m.game.hands[seats[1].id].length,22);
- assert.equal(m.game.discardPile.length,0);
- action(m,seats[1].id,{action:'discard',tileId:first});assert.equal(m.game.currentSeat,2);assert.equal(m.game.discardPile.length,1);
+ assert.throws(()=>action(m,seats[1].id,{action:'draw',source:'discard'}),/101 açacağın perleri/);
+ action(m,seats[1].id,{action:'draw',source:'wall'});assert.equal(m.game.hands[seats[1].id].length,22);
+ assert.equal(m.game.discardPile.length,1);
+ action(m,seats[1].id,{action:'discard',tileId:m.game.hands[seats[1].id][0].id});assert.equal(m.game.currentSeat,2);assert.equal(m.game.discardPile.length,2);
 });
 test('101 Okey: taş tekrar kullanımı ve sahte açma reddedilir',()=>{
  const m=newMatch(seats);const hand=m.game.hands[seats[0].id];
