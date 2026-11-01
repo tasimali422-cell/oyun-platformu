@@ -329,8 +329,9 @@ async function act(el){const name=el.dataset.act,id=el.dataset.id,no=Number(el.d
  case 'enterRoom':await enterRoom(id);break;
  case 'joinTournament':{if(!requireAuth())break;await api('/tournament/join','POST',{id});state.tournaments=(await api('/tournaments')).tournaments;render();notice('Turnuvaya kaydoldun.');break;}
   case 'chooseTable':tablePick(no);break;
-  case 'ok101Start':{const t=state.table;if(!t)break;const r=await api('/table/101/start','POST',{roomId:t.roomId,no:t.no});okey101Selected.clear();okey101Draft=[];okey101ShowSettings=false;updateTable(r.table);notice('101 Okey eli başladı.');break;}
- case 'ok101Panel':okey101ShowSettings=!okey101ShowSettings;okey101Refresh();break;
+  case 'ok101Start':{const t=state.table;if(!t)break;const r=await api('/table/101/start','POST',{roomId:t.roomId,no:t.no});okey101Selected.clear();okey101Draft=[];okey101ShowSettings=false;okey101ShowScorepad=false;updateTable(r.table);notice('101 Okey eli başladı.');break;}
+ case 'ok101Panel':okey101ShowSettings=!okey101ShowSettings;if(okey101ShowSettings)okey101ShowScorepad=false;okey101Refresh();break;
+ case 'ok101Scorepad':okey101ShowScorepad=!okey101ShowScorepad;if(okey101ShowScorepad)okey101ShowSettings=false;okey101Refresh();break;
  case 'ok101ChatToggle':{const box=el.closest('.table-bottom-chat');if(box){const expanded=box.classList.toggle('ok101-chat-expanded');el.setAttribute('aria-expanded',String(expanded));}break;}
  case 'ok101Arrange':{const t=state.table;const g=t?.okey101?.game;if(!g)break;const arrange=globalThis.Arena101Rack;if(!arrange)throw Error('Taş dizme modülü yüklenmedi. Sayfayı yenile.');okey101RackOrders.set(okey101TableKey(t),arrange.arrange(g.hand,g,el.dataset.mode==='pairs'?'pairs':'run'));okey101Selected.clear();okey101Draft=[];okey101Refresh();break;}
  case 'ok101DiscardAttempt':{if(state.table)await okey101AttemptDiscardDraw(state.table);break;}
@@ -426,11 +427,11 @@ window.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#overlayRoot').chi
 (async()=>{try{const config=await api('/config');state.games=config.games;await loadMe();if(!config.configured)notice('Yönetici hesabı henüz kurulmadı. Coolify ortam değişkenlerini ayarla.',true);}catch(e){$('#app').innerHTML=`<div class="alert">Arena Club sunucusu cevap vermedi: ${esc(e.message)}</div>`;}})();
 
 // Adapted from the supplied 101okey-coolify client, using Arena Club API/session.
-let okey101Selected=new Set(),okey101Draft=[],okey101ActiveId=null,okey101ShowSettings=false,okey101DragTile=null;
+let okey101Selected=new Set(),okey101Draft=[],okey101ActiveId=null,okey101ShowSettings=false,okey101ShowScorepad=false,okey101DragTile=null;
 const okey101RackOrders=new Map();
 const okey101Colors={red:'Kırmızı',blue:'Mavi',black:'Siyah',yellow:'Sarı'};
 const okey101SortTiles=(a,b,g)=>{const color={red:1,blue:2,black:3,yellow:4};const x=a.kind==='fake-joker'?g.okey:a,y=b.kind==='fake-joker'?g.okey:b;return (color[x.color]||9)-(color[y.color]||9)||x.num-y.num||a.id.localeCompare(b.id);};
-function okey101ResetIfNew(t){const id=t.okey101?.id||`waiting:${t.roomId}:${t.no}`;if(okey101ActiveId!==id){okey101ActiveId=id;okey101Selected.clear();okey101Draft=[];okey101ShowSettings=false;}okey101EnsureRackOrder(t);}
+function okey101ResetIfNew(t){const id=t.okey101?.id||`waiting:${t.roomId}:${t.no}`;if(okey101ActiveId!==id){okey101ActiveId=id;okey101Selected.clear();okey101Draft=[];okey101ShowSettings=false;okey101ShowScorepad=false;}okey101EnsureRackOrder(t);}
 function okey101Key(t){const m=t.okey101;return m?`${m.id}:${m.revision}:${m.phase}`:`waiting:${t.members.map(x=>x.user.id+':'+x.connected).join('|')}`;}
 function okey101TableKey(t){return `${t.roomId}:${t.no}`;}
 function okey101Face(tile,g){return tile.kind==='fake-joker'?g.okey:{color:tile.color,num:tile.num};}
@@ -484,7 +485,7 @@ function okey101Tile(t,g,select=false){if(!t)return `<span class="ok101-no-tile"
  const f=okey101Face(t,g),kind=t.kind==='fake-joker'?'sahte':okey101IsWild(t,g)?'wild':'';
  const dragAttrs=select?`draggable="false" data-ok101-drag="1"`:'';
  const hint=select?g.hints?.[t.id]:null;const warning=hint?.replace?'danger-joker':hint?.append?'danger-work':'';const label=kind==='sahte'?'SAHTE':kind==='wild'?'OKEY':esc(okey101Colors[f.color]||'');const displayValue=kind==='sahte'?'S':f.num;
- return `<${select?'button':'span'} ${select?'type="button" data-act="ok101Toggle"':''} ${dragAttrs} data-id="${esc(t.id)}" title="${hint?.replace?'KIRMIZI: Yerdeki okeyin yerine işlenebilir':hint?.append?'YEŞİL: Açık bir pere işlenebilir; atarsan 101 ceza':'Taş'}" class="ok101-tile ${esc(f.color||'black')} ${kind} ${warning} ${select&&okey101Selected.has(t.id)?'picked':''}"><strong>${esc(displayValue)}</strong><small>${label}</small>${kind==='sahte'?'<em class="ok101-fake-mark" title="Sahte okey: joker değildir">S</em>':''}${warning?`<i class="ok101-hint-dot" aria-hidden="true">${hint?.replace?'!':'+'}</i>`:''}</${select?'button':'span'}>`;
+ return `<${select?'button':'span'} ${select?'type="button" data-act="ok101Toggle"':''} ${dragAttrs} data-id="${esc(t.id)}" title="${hint?.replace?'KIRMIZI: Yerdeki okeyin yerine işlenebilir':hint?.append?'YEŞİL: Açık bir pere işlenebilir; atarsan 101 ceza':'Taş'}" class="ok101-tile ${esc(f.color||'black')} ${kind} ${warning} ${select&&okey101Selected.has(t.id)?'picked':''}"><strong>${esc(displayValue)}</strong><small>${label}</small><span class="ok101-tile-star" aria-hidden="true">★</span>${warning?`<i class="ok101-hint-dot" aria-hidden="true">${hint?.replace?'!':'+'}</i>`:''}</${select?'button':'span'}>`;
 }
 function okey101PlayerCard(t,m,p,g){const member=t.members.find(x=>x.user.id===p.id)?.user||state.users.find(x=>x.id===p.id)||{name:p.name};const pos=okey101SeatPosition(p,m.selfSeat);return `<div class="ok101-player-card ${pos} ${p.seat===g.currentSeat&&m.phase==='playing'?'active':''}">${avatar(member)}<div class="ok101-player-meta"><b class="ok101-player-name">${esc(p.name)}</b><small class="ok101-player-sub">${p.handCount} taş · ${p.opened?'açtı':'bekliyor'}</small><span class="ok101-player-score">${p.score} puan</span></div></div>`;}
 function okey101RackSlots(t,g,reserved){const slots=okey101EnsureRackOrder(t),tileMap=new Map(g.hand.map(tile=>[tile.id,tile]));return slots.map((id,index)=>{const tile=id?tileMap.get(id):null;return `<div class="ok101-slot ${tile?'filled':'empty'} ${tile&&reserved.has(tile.id)?'reserved':''}" data-ok101-slot="${index}">${tile?okey101Tile(tile,g,true):'<span class="ok101-slot-mark"></span>'}</div>`;}).join('');}
@@ -520,8 +521,8 @@ function render101(t){okey101ResetIfNew(t);const m=t.okey101,players=t.members.f
  const reserved=new Set(okey101Draft.flat());
  const opened=m.players.find(p=>p.seat===m.selfSeat)?.opened;const result=g.result;const preview=okey101PreviewInfo(t,g);const rackInfo=okey101RackAnalysis(t,g);const turnText=okey101TurnText(m,g,mine);
  return `<section class="ok101-shell arcade"><header class="ok101-topbar"><div><div class="ok101-kicker">101 OKEY · ${m.roundNo}/${m.rounds}. EL</div><b>${turnText}</b></div><div class="ok101-top-actions"><button class="btn secondary small" data-act="ok101Panel">Masa özellikleri</button>${state.me&&(state.me.id===t.ownerId||state.me.role==='admin')?'<button data-act="tableSettings" class="btn secondary small">Masa kuralları</button>':''}<button data-act="leaveTable" class="btn danger small">Ayrıl</button></div></header>
- ${okey101Scoreboard(m)}
  ${okey101ShowSettings?`<div class="ok101-settings-pop"><div class="ok101-settings-grid"><div>Oyun: <b>101 Okey</b></div><div>İzleyici: <b>${t.spectators?'Açık':'Kapalı'}</b></div><div>Özel mesaj: <b>${t.privateChat?'Açık':'Kapalı'}</b></div><div>Oyuncu: <b>${players.length}/${t.maxPlayers}</b></div><div>İzleyici: <b>${spectators.length}</b></div><div>El sayısı: <b>${t.rounds||1}</b></div></div><div class="ok101-spectators">${spectators.length?spectators.map(m=>`<button class="user-chip" type="button" data-act="player" data-id="${m.user.id}">${avatar(m.user)}<span class="nick">${userName(m.user)}</span></button>`).join(''):'<span class="help">İzleyici yok.</span>'}</div></div>`:''}
+ ${okey101ShowScorepad?`<div class="ok101-scorepad-pop">${okey101Scoreboard(m)}</div>`:''}
  <div class="ok101-arcade-table"><div class="ok101-player-ring">${m.players.filter(p=>p.seat!==m.selfSeat).map(p=>okey101PlayerCard(t,m,p,g)).join('')}</div>
  <div class="ok101-playfield"><div class="ok101-board-grid"></div>
  <div class="ok101-status-pill" role="status">${turnText}${m.phase==='playing'?` · ${g.currentSeat+1}/4`: ''}</div>
