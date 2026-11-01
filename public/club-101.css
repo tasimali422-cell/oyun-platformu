@@ -969,3 +969,65 @@
  .ok101-table-modal .ok101-player-card.top .ok101-player-name{max-width:135px!important;font-size:10px!important}
  .ok101-table-modal .ok101-player-card.top .ok101-player-sub{max-width:135px!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;font-size:8px!important}
 }
+
+/* v3.3 scorepad + board proportions */
+.ok101-tile.sahte{background:linear-gradient(180deg,#fff9ff 0%,#f3e6ff 100%)!important;border-color:#9858d3!important}
+.ok101-tile.sahte strong{color:#8a43d9!important;font-size:1.18rem!important;font-weight:900!important}
+.ok101-tile.sahte small{color:#6d38a8!important}
+.ok101-fake-mark{display:none!important}
+
+.ok101-scorepad{margin:8px 0 10px;padding:10px 12px;border:1px solid rgba(70,192,224,.42);border-radius:14px;background:rgba(5,28,42,.88);box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+.ok101-scorepad-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;color:#d9f8ff}
+.ok101-scorepad-head b{font-size:1rem;letter-spacing:.03em}
+.ok101-scorepad-head small{color:#9fd8e7}
+.ok101-scorepad-wrap{overflow:auto}
+.ok101-scorepad table{width:100%;border-collapse:separate;border-spacing:0;min-width:560px}
+.ok101-scorepad th,.ok101-scorepad td{padding:8px 10px;text-align:center;border:1px solid rgba(104,176,201,.22)}
+.ok101-scorepad thead th{background:rgba(178,72,204,.18);color:#efe2ff;font-weight:800}
+.ok101-scorepad tbody th,.ok101-scorepad tfoot th{background:rgba(255,255,255,.06);color:#e9f6fb;font-weight:800}
+.ok101-scorepad tbody td,.ok101-scorepad tfoot td{background:rgba(255,255,255,.03);color:#dceef7;font-weight:700}
+.ok101-scorepad td.good,.ok101-scorepad span.good,.ok101-final-ranking .good{color:#6be084}
+.ok101-scorepad td.bad,.ok101-scorepad span.bad,.ok101-final-ranking .bad{color:#ff8b88}
+.ok101-scorepad tr.empty td{color:#8ca7b1}
+.ok101-scorepad-ranking{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px;font-size:.82rem}
+.ok101-scorepad-ranking span{padding:5px 8px;border-radius:999px;background:rgba(255,255,255,.05)}
+
+.ok101-center-layout{grid-template-columns:minmax(0,2fr) minmax(0,1fr)!important;gap:8px!important}
+.ok101-zone{padding:10px 10px 8px!important}
+.ok101-zone-body{display:flex;flex-direction:column;gap:6px;overflow:auto}
+.ok101-zone .help{font-size:.82rem!important;color:#a9d4de}
+.ok101-zone.pairs{max-width:none}
+.ok101-meld{padding:4px 6px!important;border-radius:8px!important}
+.ok101-meld small{font-size:.72rem!important;line-height:1.1!important;margin-bottom:3px!important;display:block}
+.ok101-meld-tiles{gap:2px!important;flex-wrap:wrap}
+.ok101-meld-tiles .ok101-tile{width:24px!important;height:34px!important;min-width:24px!important;padding:0!important}
+.ok101-meld-tiles .ok101-tile strong{font-size:13px!important;line-height:1!important}
+.ok101-meld-tiles .ok101-tile small{display:none!important}
+.ok101-meld-tiles .ok101-tile .ok101-hint-dot{width:11px!important;height:11px!important;font-size:8px!important}
+.ok101-zone.pairs .ok101-meld-tiles .ok101-tile{width:22px!important;height:32px!important}
+
+.ok101-rack-toolbar{grid-template-columns:minmax(0,1fr) auto auto!important;align-items:center!important}
+.ok101-rack-title .ok101-self-label small{opacity:.7}
+
+.ok101-final-ranking{display:grid;gap:6px;margin-top:10px}
+.ok101-final-ranking>div{padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.05)}
+
+@media (max-width: 900px){
+  .ok101-scorepad{padding:8px 9px;margin:6px 0 8px}
+  .ok101-scorepad-head{align-items:flex-start;flex-direction:column;gap:4px}
+  .ok101-scorepad table{min-width:480px}
+  .ok101-center-layout{grid-template-columns:minmax(0,1fr)!important}
+}
+
+@media (orientation:landscape) and (max-height: 520px){
+  .ok101-table-modal .ok101-scorepad{margin:2px 0 4px!important;padding:4px 6px!important;border-radius:8px!important}
+  .ok101-table-modal .ok101-scorepad-head{margin-bottom:3px!important;flex-direction:row!important;gap:6px!important}
+  .ok101-table-modal .ok101-scorepad-head b{font-size:.78rem!important}
+  .ok101-table-modal .ok101-scorepad-head small{font-size:.58rem!important}
+  .ok101-table-modal .ok101-scorepad th,.ok101-table-modal .ok101-scorepad td{padding:3px 5px!important;font-size:.58rem!important}
+  .ok101-table-modal .ok101-scorepad table{min-width:420px!important}
+  .ok101-table-modal .ok101-scorepad-ranking{display:none!important}
+  .ok101-table-modal .ok101-center-layout{grid-template-columns:minmax(0,2fr) minmax(0,1fr)!important}
+  .ok101-table-modal .ok101-meld-tiles .ok101-tile{width:18px!important;height:26px!important}
+  .ok101-table-modal .ok101-meld-tiles .ok101-tile strong{font-size:10px!important}
+}
