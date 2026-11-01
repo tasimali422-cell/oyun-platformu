@@ -432,3 +432,169 @@
 .ok101-meld[data-ok101-meld-id]{touch-action:manipulation;border-color:#2ab2d5}
 .ok101-meld[data-ok101-meld-id].ok101-drop-focus{outline:3px solid #64e58e!important}
 .ok101-stackbox[data-ok101-finish-target]{touch-action:manipulation}
+
+
+/* Arena Club 101 Okey v3.0 — professional masa yerleşimi */
+.ok101-rack-meta-line{display:flex;align-items:center;gap:14px;min-width:0;flex-wrap:nowrap}
+.ok101-rack-meta-line .ok101-rack-title{margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ok101-rack-meta-line .ok101-hint-legend{display:flex;align-items:center;gap:12px;min-width:0;flex-wrap:nowrap;overflow:auto;scrollbar-width:none}
+.ok101-rack-meta-line .ok101-hint-legend::-webkit-scrollbar,.ok101-mini-actions.compact::-webkit-scrollbar{display:none}
+.ok101-rack-meta-line .ok101-hint-legend span{flex:0 0 auto}
+.ok101-rack.arcade{padding:10px 12px 12px}
+.ok101-rack-head.compact{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;flex-wrap:nowrap}
+.ok101-rack-stats.minimalist{justify-content:flex-end;flex-wrap:nowrap;align-items:center}
+.ok101-mini-actions.compact{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.ok101-mini-actions.compact>*{flex:0 0 auto}
+.ok101-rack-grid.wood{grid-template-rows:repeat(2,64px);min-height:142px;padding:10px 8px;gap:5px}
+.ok101-slot{height:58px;min-height:58px}
+.ok101-slot .ok101-tile{width:100%;height:56px}
+.ok101-player-card{background:rgba(4,31,47,.97)}
+.ok101-player-card.top{top:12px}
+.ok101-player-card.left,.ok101-player-card.right{min-width:150px;max-width:150px;padding:6px 10px;border-radius:24px}
+.ok101-player-card.left{left:14px}.ok101-player-card.right{right:14px}
+.ok101-player-name{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ok101-player-sub,.ok101-player-score{display:block}
+.ok101-status-pill{top:16px;max-width:min(88%,760px);overflow:hidden;text-overflow:ellipsis}
+.ok101-center-layout{padding-top:26px;min-height:296px}
+.ok101-zone{min-height:276px;padding:14px 14px 10px}
+.ok101-draw-area{left:50%;right:auto;transform:translateX(-50%);bottom:18px;grid-template-columns:repeat(3,112px)}
+.ok101-left-badges{left:24px;bottom:20px}
+.ok101-badge{width:auto;min-width:104px;height:auto;padding:10px 14px;border-radius:18px;flex-direction:row;gap:10px}
+.ok101-badge strong{margin:0}
+
+@media (min-width: 1001px){
+  .ok101-playfield{min-height:500px;padding:62px 92px 96px}
+  .ok101-board-grid{left:108px;right:108px;top:78px;bottom:112px}
+}
+
+@media (max-width: 1000px){
+  .ok101-rack-head.compact{grid-template-columns:minmax(0,1fr)}
+  .ok101-rack-stats.minimalist{justify-content:flex-start}
+  .ok101-rack-meta-line{overflow-x:auto}
+}
+
+@media (max-width: 900px){
+  .ok101-player-ring{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .ok101-player-card.left,.ok101-player-card.right,.ok101-player-card.top{min-width:0;max-width:none;padding:8px 10px;border-radius:18px}
+  .ok101-center-layout{grid-template-columns:1fr;min-height:0}
+  .ok101-zone{min-height:182px}
+  .ok101-draw-area{left:18px;right:18px;transform:none;grid-template-columns:repeat(3,minmax(0,1fr))}
+  .ok101-left-badges{position:static;justify-content:flex-start;margin-bottom:8px}
+  .ok101-badge{min-width:92px;padding:8px 12px}
+}
+
+@media (max-width: 640px){
+  .ok101-rack-grid.wood{grid-template-columns:repeat(7,minmax(0,1fr));grid-template-rows:repeat(4,56px);min-height:0}
+  .ok101-slot{height:54px;min-height:54px}
+  .ok101-slot .ok101-tile{height:52px}
+  .ok101-rack-meta-line{gap:8px}
+  .ok101-rack-meta-line .ok101-hint-legend{font-size:.66rem;gap:8px}
+  .ok101-mini-actions.compact .btn.small,.ok101-mini-actions.compact select{min-height:34px}
+}
+
+/* Landscape phone rebuild */
+@media (orientation:landscape) and (max-height: 520px){
+  #overlayRoot .overlay:has(.ok101-table-modal){padding:0!important;overflow:hidden!important}
+  #overlayRoot .modal.wide.ok101-table-modal{width:100vw!important;height:100dvh!important;max-height:100dvh!important;padding:4px!important;border:0!important;border-radius:0!important;display:flex!important;flex-direction:column!important;overflow:hidden!important}
+  .ok101-table-modal>.modal-title{min-height:24px!important;max-height:24px!important;height:24px!important;margin:0!important;padding:0 3px!important}
+  .ok101-table-modal>.modal-title h2{font-size:12px!important}
+  .ok101-table-modal .table-stage-101{flex:1 1 auto!important;min-height:0!important;overflow:hidden!important}
+  .ok101-table-modal .okey101-stage{height:100%!important;min-height:0!important;padding:2px!important;overflow:hidden!important}
+  .ok101-table-modal .ok101-shell{height:100%!important;min-height:0!important;display:grid!important;grid-template-rows:auto minmax(0,1fr) auto auto!important;gap:4px!important}
+  .ok101-table-modal .ok101-topbar{padding:0 2px!important;gap:6px!important;align-items:flex-start!important}
+  .ok101-table-modal .ok101-topbar b{display:block!important;font-size:.82rem!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
+  .ok101-table-modal .ok101-top-actions{overflow-x:auto!important;flex-wrap:nowrap!important;scrollbar-width:none!important}
+  .ok101-table-modal .ok101-top-actions .btn.small,.ok101-table-modal .ok101-top-actions .btn.secondary.small{padding:5px 8px!important;font-size:.62rem!important;min-height:26px!important}
+  .ok101-table-modal .ok101-arcade-table{padding:6px 8px 4px!important;border-radius:10px!important}
+  .ok101-table-modal .ok101-playfield{min-height:0!important;padding:40px 56px 60px!important;background:radial-gradient(circle at center,rgba(31,160,196,.10),rgba(0,0,0,0) 58%)!important}
+  .ok101-table-modal .ok101-board-grid{left:66px!important;right:66px!important;top:48px!important;bottom:68px!important;border-width:2px!important}
+  .ok101-table-modal .ok101-status-pill{top:6px!important;max-width:60%!important;padding:6px 14px!important;font-size:.72rem!important;border-width:2px!important;box-shadow:none!important}
+  .ok101-table-modal .ok101-player-card{padding:4px 8px!important;min-width:116px!important;max-width:116px!important;border-width:2px!important;border-radius:18px!important;box-shadow:0 6px 12px rgba(0,0,0,.22)!important}
+  .ok101-table-modal .ok101-player-card .avatar{width:24px!important;height:24px!important;min-width:24px!important}
+  .ok101-table-modal .ok101-player-card.top{top:4px!important}
+  .ok101-table-modal .ok101-player-card.left,.ok101-table-modal .ok101-player-card.right{top:50%!important;transform:translateY(-50%)!important;left:auto!important;right:auto!important}
+  .ok101-table-modal .ok101-player-card.left{left:4px!important}
+  .ok101-table-modal .ok101-player-card.right{right:4px!important}
+  .ok101-table-modal .ok101-player-name{font-size:.70rem!important}
+  .ok101-table-modal .ok101-player-sub{font-size:.54rem!important;line-height:1.15!important}
+  .ok101-table-modal .ok101-player-score{font-size:.60rem!important}
+  .ok101-table-modal .ok101-center-layout{padding-top:10px!important;gap:4px!important;grid-template-columns:1fr 1fr!important;min-height:0!important}
+  .ok101-table-modal .ok101-zone{min-height:120px!important;padding:6px!important;border-width:1px!important;border-radius:8px!important}
+  .ok101-table-modal .ok101-zone-head{margin-bottom:4px!important}
+  .ok101-table-modal .ok101-zone-head h4{font-size:.72rem!important}
+  .ok101-table-modal .ok101-zone-head span,.ok101-table-modal .ok101-zone .help{font-size:.60rem!important;line-height:1.2!important}
+  .ok101-table-modal .ok101-meld{padding:3px!important;border-radius:6px!important}
+  .ok101-table-modal .ok101-meld small{display:none!important}
+  .ok101-table-modal .ok101-meld-tiles{gap:2px!important}
+  .ok101-table-modal .ok101-meld-tiles .ok101-tile{width:20px!important;height:28px!important}
+  .ok101-table-modal .ok101-meld-tiles .ok101-tile strong{font-size:11px!important}
+  .ok101-table-modal .ok101-meld-tiles .ok101-tile small{display:none!important}
+  .ok101-table-modal .ok101-left-badges{left:10px!important;bottom:6px!important;position:absolute!important;gap:5px!important;z-index:2!important}
+  .ok101-table-modal .ok101-badge{min-width:76px!important;padding:6px 10px!important;border-radius:12px!important;border-width:2px!important}
+  .ok101-table-modal .ok101-badge span{font-size:.58rem!important}.ok101-table-modal .ok101-badge strong{font-size:.86rem!important}
+  .ok101-table-modal .ok101-draw-area{left:50%!important;right:auto!important;transform:translateX(-50%)!important;bottom:6px!important;grid-template-columns:repeat(3,82px)!important;gap:4px!important}
+  .ok101-table-modal .ok101-stackbox{min-height:46px!important;padding:4px 3px!important;border-width:2px!important;border-radius:8px!important;gap:3px!important;box-shadow:none!important}
+  .ok101-table-modal .ok101-stackbox span{font-size:.56rem!important}
+  .ok101-table-modal .ok101-stackbox strong{font-size:1rem!important}
+  .ok101-table-modal .ok101-stackbox small{display:none!important}
+  .ok101-table-modal .ok101-stock-drag{width:22px!important;height:28px!important;font-size:13px!important;border-width:1px!important}
+  .ok101-table-modal .ok101-stock-drag small{display:block!important;font-size:.42rem!important}
+  .ok101-table-modal .ok101-stackbox>.ok101-tile,.ok101-table-modal .ok101-discard-tile .ok101-tile{width:22px!important;height:28px!important;padding:0!important}
+  .ok101-table-modal .ok101-stackbox .ok101-tile strong{font-size:12px!important}
+  .ok101-table-modal .ok101-stackbox .ok101-tile small{display:none!important}
+  .ok101-table-modal .ok101-rack.arcade{margin-top:2px!important;padding:7px 8px 8px!important;border-width:1px!important;border-radius:9px!important;box-shadow:none!important}
+  .ok101-table-modal .ok101-rack-head.compact{grid-template-columns:minmax(0,1fr)!important;gap:6px!important}
+  .ok101-table-modal .ok101-rack-meta-line{gap:8px!important;overflow-x:auto!important;flex-wrap:nowrap!important;scrollbar-width:none!important}
+  .ok101-table-modal .ok101-rack-title{font-size:.80rem!important}
+  .ok101-table-modal .ok101-hint-legend{font-size:.56rem!important;gap:7px!important}
+  .ok101-table-modal .ok101-rack-stats.minimalist{justify-content:flex-start!important;gap:6px!important}
+  .ok101-table-modal .ok101-rack-stats.minimalist span{font-size:.56rem!important;padding:4px 7px!important}
+  .ok101-table-modal .ok101-mini-actions.compact{margin:5px 0 4px!important;gap:4px!important;overflow-x:auto!important;flex-wrap:nowrap!important;scrollbar-width:none!important}
+  .ok101-table-modal .ok101-mini-actions.compact .btn.small,.ok101-table-modal .ok101-mini-actions.compact select{min-height:26px!important;height:26px!important;font-size:.58rem!important;padding:4px 7px!important}
+  .ok101-table-modal .ok101-drafts{display:none!important}
+  .ok101-table-modal .ok101-rack-grid.wood{grid-template-columns:repeat(14,minmax(0,1fr))!important;grid-template-rows:repeat(2,42px)!important;min-height:92px!important;padding:6px 4px!important;gap:3px!important;border-width:1px!important;border-radius:6px!important}
+  .ok101-table-modal .ok101-slot{height:40px!important;min-height:40px!important;border-radius:4px!important;padding:0!important}
+  .ok101-table-modal .ok101-slot .ok101-tile{width:100%!important;height:38px!important;min-height:38px!important;border-radius:4px!important;box-shadow:none!important}
+  .ok101-table-modal .ok101-slot .ok101-tile strong{font-size:clamp(11px,1.9vw,15px)!important}
+  .ok101-table-modal .ok101-slot .ok101-tile small{display:none!important}
+  .ok101-table-modal .table-bottom-chat{min-height:62px!important;border-radius:8px!important;overflow:hidden!important}
+  .ok101-table-modal .table-bottom-chat .chat-caption{height:22px!important;padding:3px 8px!important;font-size:10px!important}
+  .ok101-table-modal .table-bottom-chat .two-line-log{display:block!important;height:18px!important}
+  .ok101-table-modal .table-bottom-chat .inline-compose{display:flex!important;padding:3px!important}
+  .ok101-table-modal .table-bottom-chat .inline-compose input{min-height:28px!important}
+}
+
+/* v3.0.1 quick polish */
+@media (min-width:1001px){
+  .ok101-status-pill{top:52px}
+  .ok101-playfield{padding-top:92px}
+  .ok101-board-grid{top:106px}
+  .ok101-player-card.top{top:12px}
+}
+
+@media (orientation:landscape) and (max-height: 520px){
+  .ok101-table-modal .ok101-shell{grid-template-rows:auto minmax(0,1fr) auto!important}
+  .ok101-table-modal .ok101-arcade-table{min-height:138px!important}
+  .ok101-table-modal .ok101-playfield{padding:34px 48px 48px!important}
+  .ok101-table-modal .ok101-board-grid{left:58px!important;right:58px!important;top:40px!important;bottom:52px!important}
+  .ok101-table-modal .ok101-status-pill{top:4px!important;max-width:54%!important}
+  .ok101-table-modal .ok101-center-layout{padding-top:4px!important;min-height:74px!important}
+  .ok101-table-modal .ok101-zone{min-height:74px!important;padding:4px 6px!important}
+  .ok101-table-modal .ok101-zone-body{gap:3px!important}
+  .ok101-table-modal .ok101-left-badges{left:8px!important;bottom:4px!important}
+  .ok101-table-modal .ok101-draw-area{bottom:4px!important;height:48px!important;align-items:stretch!important}
+  .ok101-table-modal .ok101-stackbox{height:48px!important;min-height:48px!important}
+  .ok101-table-modal .ok101-rack.arcade{padding:5px 6px 6px!important}
+  .ok101-table-modal .ok101-rack-title{font-size:.72rem!important}
+  .ok101-table-modal .ok101-rack-head.compact{gap:4px!important}
+  .ok101-table-modal .ok101-rack-stats.minimalist span{font-size:.52rem!important;padding:3px 6px!important}
+  .ok101-table-modal .ok101-mini-actions.compact{margin:4px 0 3px!important;gap:3px!important}
+  .ok101-table-modal .ok101-mini-actions.compact .btn.small,.ok101-table-modal .ok101-mini-actions.compact select{min-height:22px!important;height:22px!important;font-size:.53rem!important;padding:2px 5px!important}
+  .ok101-table-modal .ok101-rack-grid.wood{grid-template-rows:repeat(2,34px)!important;min-height:76px!important;padding:4px 3px!important;gap:2px!important}
+  .ok101-table-modal .ok101-slot{height:32px!important;min-height:32px!important}
+  .ok101-table-modal .ok101-slot .ok101-tile{height:30px!important;min-height:30px!important}
+  .ok101-table-modal .ok101-slot .ok101-tile strong{font-size:12px!important}
+  .ok101-table-modal .table-bottom-chat{min-height:28px!important;max-height:28px!important;height:28px!important}
+  .ok101-table-modal .table-bottom-chat .chat-caption{height:27px!important;padding:3px 8px!important}
+  .ok101-table-modal .table-bottom-chat .two-line-log,.ok101-table-modal .table-bottom-chat .inline-compose{display:none!important}
+}
